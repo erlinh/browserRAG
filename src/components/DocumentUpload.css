@@ -1,0 +1,104 @@
+.document-upload {
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+}
+
+.upload-area {
+  background-color: rgba(255, 255, 255, 0.05);
+  border-radius: 0.5rem;
+  padding: 2rem;
+  text-align: center;
+}
+
+.file-input-container {
+  margin: 2rem 0;
+}
+
+.file-input {
+  width: 0.1px;
+  height: 0.1px;
+  opacity: 0;
+  overflow: hidden;
+  position: absolute;
+  z-index: -1;
+}
+
+.file-input-label {
+  display: inline-block;
+  padding: 0.75rem 1.5rem;
+  background-color: #3b82f6;
+  color: white;
+  border-radius: 0.25rem;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  font-weight: 500;
+}
+
+.file-input-label:hover {
+  background-color: #2563eb;
+}
+
+.file-input-label.disabled {
+  background-color: #9ca3af;
+  cursor: not-allowed;
+}
+
+.file-format-note {
+  margin-top: 0.5rem;
+  font-size: 0.875rem;
+  color: #9ca3af;
+}
+
+.progress-container {
+  margin-top: 1.5rem;
+}
+
+.progress-bar {
+  height: 0.5rem;
+  background-color: #e5e7eb;
+  border-radius: 9999px;
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  background-color: #3b82f6;
+  transition: width 0.3s ease;
+}
+
+.progress-text {
+  margin-top: 0.5rem;
+  font-size: 0.875rem;
+}
+
+.error-message {
+  margin-top: 1rem;
+  color: #ef4444;
+  font-size: 0.875rem;
+}
+
+.documents-list {
+  background-color: rgba(255, 255, 255, 0.05);
+  border-radius: 0.5rem;
+  padding: 1.5rem;
+}
+
+.documents-list h3 {
+  margin-top: 0;
+  margin-bottom: 1rem;
+  font-size: 1.25rem;
+}
+
+.documents-list ul {
+  margin: 0;
+  padding: 0;
+  list-style-type: none;
+}
+
+.documents-list li {
+  padding: 0.75rem 1rem;
+  background-color: rgba(255, 255, 255, 0.05);
+  border-radius: 0.25rem;
+  margin-bottom: 0.5rem;
+} 
