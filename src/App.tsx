@@ -2,12 +2,14 @@ import { useState, useEffect } from 'react';
 import DocumentUpload from './components/DocumentUpload';
 import Chat from './components/Chat';
 import { initializeVectorStore } from './services/vectorStore';
+import { useModel } from './contexts/ModelContext';
 import './App.css';
 
 function App() {
   const [isDbReady, setIsDbReady] = useState(false);
   const [activeTab, setActiveTab] = useState('upload');
   const [documents, setDocuments] = useState<string[]>([]);
+  const { selectedModel } = useModel();
 
   useEffect(() => {
     const setupDatabase = async () => {
@@ -62,7 +64,11 @@ function App() {
       </main>
 
       <footer className="app-footer">
-        <p>All processing happens in your browser - your data never leaves your device</p>
+        <p>
+          All processing happens in your browser - your data never leaves your device.
+          <br />
+          <small>Currently using model: {selectedModel.name}</small>
+        </p>
       </footer>
     </div>
   );

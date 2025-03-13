@@ -5,17 +5,30 @@ import {
   TextStreamer,
 } from '@huggingface/transformers';
 
-// Global variables to store the model and tokenizer
-let llmModel: any = null;
-let tokenizer: any = null;
+// Cache for storing loaded models and tokenizers
+interface ModelCache {
+  [modelId: string]: {
+    model: any;
+    tokenizer: any;
+  }
+}
+
+// Global variables
+let modelCache: ModelCache = {};
+let currentModelId: string | null = null;
 let isBrowserCompatible = false;
 let llmIsLoading = false;
-const MODEL_ID = 'onnx-community/DeepSeek-R1-Distill-Qwen-1.5B-ONNX';
+const DEFAULT_MODEL_ID = 'onnx-community/DeepSeek-R1-Distill-Qwen-1.5B-ONNX';
 
 // Variables to track thinking content
 let isThinking = false;
 let thinkingBuffer = '';
 let normalOutputBuffer = '';
+
+// Check if the model is a chat model that supports chat templates
+const isChatModel = (modelId: string): boolean => {
+  return modelId.includes('DeepSeek') || modelId.includes('Qwen') || modelId.includes('Phi-3');
+};
 
 /**
  * Check if WebGPU or WebGL is supported
@@ -53,9 +66,24 @@ export const checkBrowserCompatibility = async (): Promise<boolean> => {
  * Initialize the LLM model
  */
 export const initializeLLM = async (
-  progressCallback?: (progress: { status: string; message: string; progress?: number }) => void
+  modelId: string = DEFAULT_MODEL_ID,
+  progressCallback?: (progress: { status: string; message: string; progress?: number; stage?: string }) => void
 ): Promise<void> => {
   if (llmIsLoading) {
+    return;
+  }
+  
+  // If model is already loaded, use it
+  if (modelCache[modelId] && modelCache[modelId].model && modelCache[modelId].tokenizer) {
+    currentModelId = modelId;
+    if (progressCallback) {
+      progressCallback({ 
+        status: 'success', 
+        message: 'Model already loaded', 
+        progress: 100,
+        stage: 'complete'
+      });
+    }
     return;
   }
   
@@ -70,28 +98,39 @@ export const initializeLLM = async (
     }
     
     if (progressCallback) {
-      progressCallback({ status: 'loading', message: 'Loading tokenizer...' });
+      progressCallback({ 
+        status: 'loading', 
+        message: 'Loading tokenizer...', 
+        progress: 0,
+        stage: 'tokenizer'
+      });
     }
     
     // Load tokenizer
-    tokenizer = await AutoTokenizer.from_pretrained(MODEL_ID, {
+    const tokenizer = await AutoTokenizer.from_pretrained(modelId, {
       progress_callback: (progress: any) => {
         if (progressCallback && progress.progress) {
           progressCallback({
             status: 'loading',
             message: `Loading tokenizer (${Math.round(progress.progress * 100)}%)`,
             progress: progress.progress * 30,
+            stage: 'tokenizer'
           });
         }
       },
     });
     
     if (progressCallback) {
-      progressCallback({ status: 'loading', message: 'Loading LLM model...', progress: 30 });
+      progressCallback({ 
+        status: 'loading', 
+        message: 'Loading LLM model...', 
+        progress: 30,
+        stage: 'model'
+      });
     }
     
     // Load model
-    llmModel = await AutoModelForCausalLM.from_pretrained(MODEL_ID, {
+    const model = await AutoModelForCausalLM.from_pretrained(modelId, {
       dtype: 'q4f16',
       device: 'webgpu',
       progress_callback: (progress: any) => {
@@ -100,21 +139,36 @@ export const initializeLLM = async (
             status: 'loading',
             message: `Loading LLM model (${Math.round(progress.progress * 100)}%)`,
             progress: 30 + progress.progress * 50,
+            stage: 'model'
           });
         }
       },
     });
     
     if (progressCallback) {
-      progressCallback({ status: 'loading', message: 'Warming up model...', progress: 80 });
+      progressCallback({ 
+        status: 'loading', 
+        message: 'Warming up model...', 
+        progress: 80,
+        stage: 'warmup'
+      });
     }
     
     // Warm up the model with a small input
     const warmUpInput = tokenizer('Hello, world!');
-    await llmModel.generate({ ...warmUpInput, max_new_tokens: 1 });
+    await model.generate({ ...warmUpInput, max_new_tokens: 1 });
+    
+    // Store in cache
+    modelCache[modelId] = { model, tokenizer };
+    currentModelId = modelId;
     
     if (progressCallback) {
-      progressCallback({ status: 'success', message: 'LLM model loaded successfully', progress: 100 });
+      progressCallback({ 
+        status: 'success', 
+        message: 'LLM model loaded successfully', 
+        progress: 100,
+        stage: 'complete'
+      });
     }
   } catch (error) {
     console.error('Failed to initialize LLM:', error);
@@ -122,6 +176,7 @@ export const initializeLLM = async (
       progressCallback({
         status: 'error',
         message: `Failed to load LLM model: ${error instanceof Error ? error.message : String(error)}`,
+        stage: 'error'
       });
     }
     throw error;
@@ -175,10 +230,28 @@ const emitThinkingEvent = (text: string) => {
  */
 export const generateResponse = async (
   prompt: string,
+  modelId: string = DEFAULT_MODEL_ID,
+  progressCallback?: (progress: { status: string; message: string; progress?: number; stage?: string }) => void,
   streamCallback?: (token: string) => void
 ): Promise<string> => {
-  if (!llmModel || !tokenizer) {
-    await initializeLLM();
+  // Check if we need to load or switch models
+  if (!modelCache[modelId] || currentModelId !== modelId) {
+    if (progressCallback) {
+      progressCallback({ 
+        status: 'loading', 
+        message: 'Loading model...', 
+        progress: 0,
+        stage: 'model-load'
+      });
+    }
+    await initializeLLM(modelId, progressCallback);
+  }
+  
+  const model = modelCache[modelId].model;
+  const tokenizer = modelCache[modelId].tokenizer;
+  
+  if (!model || !tokenizer) {
+    throw new Error(`Model ${modelId} failed to load properly`);
   }
   
   try {
@@ -190,6 +263,15 @@ export const generateResponse = async (
     // Get and reset stopping criteria
     const stoppingCriteria = getStoppingCriteria();
     stoppingCriteria.reset();
+    
+    if (progressCallback) {
+      progressCallback({ 
+        status: 'loading', 
+        message: 'Generating response...', 
+        progress: 0,
+        stage: 'generation'
+      });
+    }
     
     // Create a callback to capture token output
     const tokenCallbackFunction = (token: string) => {
@@ -235,41 +317,91 @@ export const generateResponse = async (
       enhancedPrompt = `${prompt}\n\nYou can use <think>...</think> tags to show your thinking process.`;
     }
     
-    // Format the input for the model
-    const messages = [
-      { role: 'user', content: enhancedPrompt }
-    ];
+    let inputs;
     
-    const inputs = tokenizer.apply_chat_template(messages, {
-      add_generation_prompt: true,
-      return_dict: true,
-    });
+    // Handle different model types appropriately
+    if (isChatModel(modelId)) {
+      // For chat models, use the chat template
+      const messages = [
+        { role: 'user', content: enhancedPrompt }
+      ];
+      
+      inputs = tokenizer.apply_chat_template(messages, {
+        add_generation_prompt: true,
+        return_dict: true,
+      });
+    } else {
+      // For non-chat models (like GPT-2), use a simple prefix format
+      inputs = tokenizer(
+        `Question: ${enhancedPrompt}\n\nAnswer:`,
+        { return_tensors: 'pt' }
+      );
+    }
     
-    // Generate the response
-    const output = await llmModel.generate({
+    // Generate the response - fix stopping_criteria to be an array
+    const output = await model.generate({
       ...inputs,
       max_new_tokens: 1024,
       do_sample: true,
       temperature: 0.7,
       top_p: 0.95,
-      streamer,
-      stopping_criteria: [stoppingCriteria], // Pass as an array
+      stopping_criteria: [stoppingCriteria],  // Pass as array
+      streamer: streamer,
     });
     
-    // Check if we have any normal output
-    if (normalOutputBuffer.trim().length === 0) {
-      // If no normal output but we have thinking, use the thinking content as the response
-      if (thinkingBuffer.trim().length > 0) {
-        console.log("No normal output, using thinking content as response");
-        normalOutputBuffer = `Based on my analysis: ${thinkingBuffer.split('\n').pop() || thinkingBuffer}`;
-      } else {
-        normalOutputBuffer = "I couldn't generate a proper response. Please try asking in a different way.";
-      }
+    if (progressCallback) {
+      progressCallback({ 
+        status: 'success', 
+        message: 'Response generated successfully', 
+        progress: 100,
+        stage: 'complete'
+      });
     }
     
     return normalOutputBuffer;
   } catch (error) {
     console.error('Error generating response:', error);
+    if (progressCallback) {
+      progressCallback({
+        status: 'error',
+        message: `Error generating response: ${error instanceof Error ? error.message : String(error)}`,
+        stage: 'error'
+      });
+    }
     throw error;
   }
+};
+
+/**
+ * Get currently loaded model ID
+ */
+export const getCurrentModelId = (): string | null => {
+  return currentModelId;
+};
+
+/**
+ * Check if a specific model is loaded
+ */
+export const isModelLoaded = (modelId: string): boolean => {
+  return !!modelCache[modelId] && !!modelCache[modelId].model && !!modelCache[modelId].tokenizer;
+};
+
+/**
+ * Clear a specific model from cache
+ */
+export const clearModelFromCache = (modelId: string): void => {
+  if (modelCache[modelId]) {
+    delete modelCache[modelId];
+    if (currentModelId === modelId) {
+      currentModelId = null;
+    }
+  }
+};
+
+/**
+ * Clear all models from cache
+ */
+export const clearAllModelsFromCache = (): void => {
+  modelCache = {};
+  currentModelId = null;
 }; 

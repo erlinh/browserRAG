@@ -1,5 +1,8 @@
 import { useState, useRef, useEffect } from 'react';
-import { queryDocuments } from '../services/ragService';
+import { queryDocuments, ProgressCallback } from '../services/ragService';
+import { useModel, ProgressInfo } from '../contexts/ModelContext';
+import ModelSelector from './ModelSelector';
+import ProgressBar from './ProgressBar';
 import './Chat.css';
 
 interface Message {
@@ -9,6 +12,7 @@ interface Message {
   timestamp: Date;
   isThinking?: boolean;
   thinkingFor?: string; // ID of the question this thinking relates to
+  isStreaming?: boolean; // For streaming partial responses
 }
 
 interface ChatProps {
@@ -22,6 +26,10 @@ const Chat: React.FC<ChatProps> = ({ documents }) => {
   const [error, setError] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const currentQuestionRef = useRef<string | null>(null);
+  const streamingIdRef = useRef<string | null>(null);
+  
+  // Get model context
+  const { selectedModel, progressInfo, setProgressInfo } = useModel();
 
   // Add initial assistant message
   useEffect(() => {
@@ -83,9 +91,30 @@ const Chat: React.FC<ChatProps> = ({ documents }) => {
     };
   }, []);
 
+  // Stream response token by token
+  const handleStreamToken = (token: string) => {
+    if (streamingIdRef.current) {
+      setMessages(prev => {
+        return prev.map(msg => 
+          msg.id === streamingIdRef.current
+            ? { ...msg, content: msg.content + token }
+            : msg
+        );
+      });
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!input.trim() || isProcessing) return;
+
+    // Reset error and progress
+    setError(null);
+    setProgressInfo({
+      status: 'idle',
+      message: '',
+      progress: 0
+    });
 
     // Generate unique ID for this question
     const questionId = Date.now().toString();
@@ -101,59 +130,77 @@ const Chat: React.FC<ChatProps> = ({ documents }) => {
     setMessages(prev => [...prev, userMessage]);
     setInput('');
     setIsProcessing(true);
-    setError(null);
     
     try {
-      // Show "typing" message immediately
-      const tempAssistantId = `temp-${questionId}`;
+      // Create streaming response message
+      const streamingId = `stream-${questionId}`;
+      streamingIdRef.current = streamingId;
+      
       setMessages(prev => [
         ...prev,
         {
-          id: tempAssistantId,
+          id: streamingId,
           role: 'assistant',
-          content: '...',
+          content: '',
           timestamp: new Date(),
-        },
+          isStreaming: true
+        }
       ]);
 
-      const response = await queryDocuments(userMessage.content);
+      // Define a properly typed progress callback
+      const progressCallback: ProgressCallback = (progress) => {
+        setProgressInfo({
+          status: progress.status as 'idle' | 'loading' | 'success' | 'error',
+          message: progress.message,
+          progress: progress.progress,
+          stage: progress.stage
+        });
+      };
+
+      // Query documents with the selected model and progress updates
+      const response = await queryDocuments(
+        userMessage.content, 
+        selectedModel.id,
+        progressCallback,
+        handleStreamToken
+      );
       
-      // Remove temp message and update with final response
+      // After the final response is complete, update the streaming status
+      streamingIdRef.current = null;
       setMessages(prev => {
-        // Filter out temporary typing indicator
-        const withoutTemp = prev.filter(m => m.id !== tempAssistantId);
-        
-        // Convert thinking message to collapsed version if it exists
-        const withCollapsedThinking = withoutTemp.map(m => 
+        return prev.map(msg => 
+          msg.id === streamingId
+            ? { ...msg, isStreaming: false, content: response }
+            : msg
+        );
+      });
+      
+      // Convert thinking message to collapsed version if it exists
+      setMessages(prev => {
+        return prev.map(m => 
           (m.isThinking && m.thinkingFor === questionId) 
             ? { ...m, isThinking: false } 
             : m
         );
-        
-        // Add the final response
-        return [
-          ...withCollapsedThinking,
-          {
-            id: `answer-${questionId}`,
-            role: 'assistant',
-            content: response,
-            timestamp: new Date(),
-          }
-        ];
       });
     } catch (err) {
       console.error('Error querying documents:', err);
       setError(err instanceof Error ? err.message : 'An error occurred while processing your request');
       
-      // Remove temp message if it exists
-      setMessages(prev => 
-        prev.filter(m => m.id !== `temp-${questionId}`).concat({
-          id: `error-${questionId}`,
-          role: 'assistant',
-          content: 'Sorry, I encountered an error processing your request. Please try again.',
-          timestamp: new Date(),
-        })
-      );
+      // Remove streaming message if it exists
+      if (streamingIdRef.current) {
+        const streamingId = streamingIdRef.current;
+        streamingIdRef.current = null;
+        
+        setMessages(prev => 
+          prev.filter(m => m.id !== streamingId).concat({
+            id: `error-${questionId}`,
+            role: 'assistant',
+            content: 'Sorry, I encountered an error processing your request. Please try again.',
+            timestamp: new Date(),
+          })
+        );
+      }
     } finally {
       setIsProcessing(false);
       currentQuestionRef.current = null;
@@ -162,15 +209,25 @@ const Chat: React.FC<ChatProps> = ({ documents }) => {
 
   return (
     <div className="chat-container">
+      <div className="chat-controls">
+        <ModelSelector />
+        <ProgressBar 
+          progress={progressInfo.progress || 0}
+          status={progressInfo.status}
+          message={progressInfo.message}
+          stage={progressInfo.stage}
+        />
+      </div>
+      
       <div className="messages-container">
         {messages.map(message => (
           <div 
             key={message.id} 
-            className={`message ${message.role === 'user' ? 'user-message' : 'assistant-message'} ${message.isThinking ? 'thinking-message' : ''}`}
+            className={`message ${message.role === 'user' ? 'user-message' : 'assistant-message'} ${message.isThinking ? 'thinking-message' : ''} ${message.isStreaming ? 'streaming-message' : ''}`}
           >
             {message.isThinking && <div className="thinking-label">Thinking...</div>}
             <div className="message-content">
-              {message.content === '...' ? (
+              {message.isStreaming && message.content === '' ? (
                 <div className="typing-indicator">
                   <span></span>
                   <span></span>

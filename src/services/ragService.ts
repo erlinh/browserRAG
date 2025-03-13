@@ -2,30 +2,120 @@ import { generateEmbedding } from './embeddingService';
 import { queryEmbeddings } from './vectorStore';
 import { generateResponse } from './llmService';
 
+// Define a type for progress callback
+export type ProgressCallback = (progress: { status: string; message: string; progress?: number; stage?: string }) => void;
+
 /**
  * Query documents using RAG (Retrieval Augmented Generation)
  */
-export const queryDocuments = async (question: string): Promise<string> => {
+export const queryDocuments = async (
+  question: string,
+  modelId?: string,
+  progressCallback?: ProgressCallback,
+  streamCallback?: (token: string) => void
+): Promise<string> => {
   try {
+    // Update progress
+    if (progressCallback) {
+      progressCallback({ 
+        status: 'loading', 
+        message: 'Generating embeddings for your question...', 
+        progress: 0,
+        stage: 'embedding' 
+      });
+    }
+    
     // 1. Generate embedding for the query
     const queryEmbedding = await generateEmbedding(question);
+    
+    // Update progress
+    if (progressCallback) {
+      progressCallback({ 
+        status: 'loading', 
+        message: 'Retrieving relevant context from documents...', 
+        progress: 20,
+        stage: 'retrieval' 
+      });
+    }
     
     // 2. Retrieve similar chunks from the vector database
     const similarChunks = await queryEmbeddings(queryEmbedding, 5);
     
     if (similarChunks.length === 0) {
+      if (progressCallback) {
+        progressCallback({ 
+          status: 'error', 
+          message: 'No relevant context found', 
+          progress: 100,
+          stage: 'complete' 
+        });
+      }
       return "I couldn't find any relevant information in the documents to answer your question. Could you try rephrasing or asking about something else?";
+    }
+    
+    // Update progress
+    if (progressCallback) {
+      progressCallback({ 
+        status: 'loading', 
+        message: 'Constructing prompt with retrieved context...', 
+        progress: 40,
+        stage: 'prompt' 
+      });
     }
     
     // 3. Construct a prompt with retrieved context
     const prompt = constructRAGPrompt(question, similarChunks);
     
+    // Update progress
+    if (progressCallback) {
+      progressCallback({ 
+        status: 'loading', 
+        message: 'Generating response...', 
+        progress: 50,
+        stage: 'generation' 
+      });
+    }
+    
     // 4. Generate response using the LLM
-    const response = await generateResponse(prompt);
+    const response = await generateResponse(
+      prompt,
+      modelId,
+      (progress) => {
+        if (progressCallback) {
+          // Scale the progress to be between 50-100%
+          const scaledProgress = progress.progress !== undefined
+            ? 50 + (progress.progress * 0.5)
+            : undefined;
+          
+          progressCallback({
+            ...progress,
+            progress: scaledProgress
+          });
+        }
+      },
+      streamCallback // Pass the streaming callback
+    );
+    
+    // Update final progress
+    if (progressCallback) {
+      progressCallback({ 
+        status: 'success', 
+        message: 'Response generated successfully', 
+        progress: 100,
+        stage: 'complete' 
+      });
+    }
     
     return response;
   } catch (error) {
     console.error('Error querying documents:', error);
+    if (progressCallback) {
+      progressCallback({ 
+        status: 'error', 
+        message: `Error querying documents: ${error instanceof Error ? error.message : String(error)}`,
+        stage: 'error' 
+      });
+    }
     throw error;
   }
 };
@@ -76,24 +166,36 @@ ANSWER:`;
  * Initialize the RAG system
  */
 export const initializeRAG = async (
-  progressCallback?: (progress: { status: string; message: string; progress?: number }) => void
+  modelId?: string,
+  progressCallback?: ProgressCallback
 ): Promise<void> => {
   try {
     // Initialize embedding model and LLM
     if (progressCallback) {
-      progressCallback({ status: 'loading', message: 'Initializing RAG system...' });
+      progressCallback({ 
+        status: 'loading', 
+        message: 'Initializing RAG system...', 
+        progress: 0,
+        stage: 'init' 
+      });
     }
     
     // The actual initialization is done lazily when needed
     if (progressCallback) {
-      progressCallback({ status: 'success', message: 'RAG system initialized' });
+      progressCallback({ 
+        status: 'success', 
+        message: 'RAG system initialized', 
+        progress: 100,
+        stage: 'complete' 
+      });
     }
   } catch (error) {
     console.error('Failed to initialize RAG system:', error);
     if (progressCallback) {
       progressCallback({ 
         status: 'error', 
-        message: `Failed to initialize RAG system: ${error instanceof Error ? error.message : String(error)}`
+        message: `Failed to initialize RAG system: ${error instanceof Error ? error.message : String(error)}`,
+        stage: 'error'
       });
     }
     throw error;

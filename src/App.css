@@ -1,42 +1,73 @@
+:root {
+  --app-bg-color: #0f172a;
+  --app-header-bg: #1e293b;
+  --app-text-color: #f3f4f6;
+  --app-border-color: rgba(255, 255, 255, 0.1);
+  --app-accent-color: #3b82f6;
+}
+
+body {
+  margin: 0;
+  background-color: var(--app-bg-color);
+  color: var(--app-text-color);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen,
+    Ubuntu, Cantarell, "Open Sans", "Helvetica Neue", sans-serif;
+}
+
 .app-container {
+  max-width: 1200px;
+  min-height: 100vh;
+  margin: 0 auto;
   display: flex;
   flex-direction: column;
-  width: 100%;
-  height: 100%;
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 1rem;
 }
 
 .app-header {
+  padding: 1.5rem 1rem;
   text-align: center;
-  margin-bottom: 2rem;
+  background-color: var(--app-header-bg);
+  border-bottom: 1px solid var(--app-border-color);
 }
 
 .app-header h1 {
-  margin-bottom: 0.5rem;
+  margin: 0;
+  font-size: 2rem;
+  color: var(--app-text-color);
+}
+
+.app-header p {
+  margin: 0.5rem 0 0;
+  color: rgba(255, 255, 255, 0.7);
 }
 
 .app-tabs {
   display: flex;
-  margin-bottom: 1rem;
-  border-bottom: 1px solid #ccc;
+  gap: 0.5rem;
+  border-bottom: 1px solid var(--app-border-color);
+  padding: 0 1rem;
+  background-color: var(--app-header-bg);
 }
 
 .app-tabs button {
-  padding: 0.75rem 1.5rem;
+  padding: 1rem 1.5rem;
   background: none;
   border: none;
-  border-bottom: 3px solid transparent;
+  color: rgba(255, 255, 255, 0.6);
   font-size: 1rem;
+  font-weight: 500;
   cursor: pointer;
+  border-bottom: 2px solid transparent;
   transition: all 0.2s;
 }
 
+.app-tabs button:hover:not(:disabled) {
+  color: var(--app-text-color);
+  border-bottom-color: rgba(255, 255, 255, 0.2);
+}
+
 .app-tabs button.active {
-  border-bottom-color: #3b82f6;
-  color: #3b82f6;
-  font-weight: 600;
+  color: var(--app-accent-color);
+  border-bottom-color: var(--app-accent-color);
 }
 
 .app-tabs button:disabled {
@@ -46,15 +77,22 @@
 
 .app-content {
   flex: 1;
-  overflow: auto;
-  padding: 1rem;
-  background-color: rgba(255, 255, 255, 0.05);
-  border-radius: 0.5rem;
+  display: flex;
+  flex-direction: column;
+  background-color: var(--app-bg-color);
 }
 
 .app-footer {
-  margin-top: 2rem;
   text-align: center;
+  padding: 1rem;
   font-size: 0.875rem;
-  opacity: 0.7;
+  color: rgba(255, 255, 255, 0.5);
+  border-top: 1px solid var(--app-border-color);
+  background-color: var(--app-header-bg);
+}
+
+.app-footer small {
+  display: block;
+  margin-top: 0.5rem;
+  color: rgba(255, 255, 255, 0.4);
 } 
