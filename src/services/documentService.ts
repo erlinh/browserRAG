@@ -180,7 +180,7 @@ export const processCsvDocument = async (
           const chunks: DocumentChunk[] = [];
           
           // Get headers
-          const headers = meta.fields || Object.keys(data[0]);
+          const headers = meta.fields || Object.keys(data[0] as object);
           
           // Process each row
           data.forEach((row: any, rowIndex) => {
