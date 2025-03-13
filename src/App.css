@@ -4,6 +4,7 @@
   --app-text-color: #f3f4f6;
   --app-border-color: rgba(255, 255, 255, 0.1);
   --app-accent-color: #3b82f6;
+  --sidebar-width: 300px;
 }
 
 body {
@@ -15,9 +16,7 @@ body {
 }
 
 .app-container {
-  max-width: 1200px;
   min-height: 100vh;
-  margin: 0 auto;
   display: flex;
   flex-direction: column;
 }
@@ -38,6 +37,27 @@ body {
 .app-header p {
   margin: 0.5rem 0 0;
   color: rgba(255, 255, 255, 0.7);
+}
+
+.app-main {
+  display: flex;
+  flex: 1;
+}
+
+.app-sidebar {
+  width: var(--sidebar-width);
+  flex-shrink: 0;
+  border-right: 1px solid var(--app-border-color);
+  background-color: var(--app-header-bg);
+  overflow-y: auto;
+  position: sticky;
+  top: 0;
+}
+
+.app-content-wrapper {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
 }
 
 .app-tabs {
@@ -104,10 +124,6 @@ body {
   margin-bottom: 1.5rem;
   font-size: 1.5rem;
   color: var(--app-text-color);
-}
-
-.project-selector-container {
-  margin: 1.5rem;
 }
 
 .chat-interface {

@@ -218,77 +218,81 @@ function App() {
         <p>Chat with your documents entirely in your browser</p>
       </header>
 
-      <div className="project-selector-container">
-        <ProjectSelector 
-          projects={projects} 
-          selectedProjectId={selectedProject?.id || ''} 
-          onSelectProject={handleProjectChange}
-          onCreateProject={handleCreateProject}
-          onDeleteProject={handleDeleteProject}
-        />
-      </div>
-
-      <nav className="app-tabs">
-        <button 
-          className={activeTab === 'upload' ? 'active' : ''} 
-          onClick={() => setActiveTab('upload')}
-        >
-          Upload Documents
-        </button>
-        <button 
-          className={activeTab === 'chat' ? 'active' : ''} 
-          onClick={() => setActiveTab('chat')}
-          disabled={totalDocuments === 0}
-        >
-          Chat
-        </button>
-      </nav>
-
-      <main className="app-content">
-        {activeTab === 'upload' ? (
-          <DocumentUpload 
-            isDbReady={isDbReady} 
-            documents={documents}
-            onDocumentProcessed={handleDocumentUpload}
-            onDeleteDocument={handleDeleteDocument}
-            currentPage={currentPage}
-            totalDocuments={totalDocuments}
-            pageSize={pageSize}
-            onPageChange={handlePageChange}
-            projectId={selectedProject?.id || ''}
+      <div className="app-main">
+        <aside className="app-sidebar">
+          <ProjectSelector 
+            projects={projects} 
+            selectedProjectId={selectedProject?.id || ''} 
+            onSelectProject={handleProjectChange}
+            onCreateProject={handleCreateProject}
+            onDeleteProject={handleDeleteProject}
           />
-        ) : (
-          <div className="chat-interface">
-            <div className="chat-sidebar">
-              <ChatList 
-                chats={chatSessions}
-                selectedChatId={selectedChatId}
-                onSelectChat={setSelectedChatId}
-                onCreateChat={handleCreateChat}
-                onDeleteChat={handleDeleteChat}
-                onRenameChat={handleRenameChat}
+        </aside>
+
+        <div className="app-content-wrapper">
+          <nav className="app-tabs">
+            <button 
+              className={activeTab === 'upload' ? 'active' : ''} 
+              onClick={() => setActiveTab('upload')}
+            >
+              Upload Documents
+            </button>
+            <button 
+              className={activeTab === 'chat' ? 'active' : ''} 
+              onClick={() => setActiveTab('chat')}
+              disabled={totalDocuments === 0}
+            >
+              Chat
+            </button>
+          </nav>
+
+          <main className="app-content">
+            {activeTab === 'upload' ? (
+              <DocumentUpload 
+                isDbReady={isDbReady} 
+                documents={documents}
+                onDocumentProcessed={handleDocumentUpload}
+                onDeleteDocument={handleDeleteDocument}
+                currentPage={currentPage}
+                totalDocuments={totalDocuments}
+                pageSize={pageSize}
+                onPageChange={handlePageChange}
+                projectId={selectedProject?.id || ''}
               />
-            </div>
-            <div className="chat-main">
-              {selectedChatId && selectedProject && selectedChatSession ? (
-                <Chat 
-                  documents={documentNames} 
-                  chatId={selectedChatId}
-                  projectId={selectedProject.id}
-                  chatSession={selectedChatSession}
-                />
-              ) : (
-                <div className="no-chat-selected">
-                  {totalDocuments === 0 ? 
-                    "Upload documents first to start chatting" : 
-                    "Select or create a chat to begin"
-                  }
+            ) : (
+              <div className="chat-interface">
+                <div className="chat-sidebar">
+                  <ChatList 
+                    chats={chatSessions}
+                    selectedChatId={selectedChatId}
+                    onSelectChat={setSelectedChatId}
+                    onCreateChat={handleCreateChat}
+                    onDeleteChat={handleDeleteChat}
+                    onRenameChat={handleRenameChat}
+                  />
                 </div>
-              )}
-            </div>
-          </div>
-        )}
-      </main>
+                <div className="chat-main">
+                  {selectedChatId && selectedProject && selectedChatSession ? (
+                    <Chat 
+                      documents={documentNames} 
+                      chatId={selectedChatId}
+                      projectId={selectedProject.id}
+                      chatSession={selectedChatSession}
+                    />
+                  ) : (
+                    <div className="no-chat-selected">
+                      {totalDocuments === 0 ? 
+                        "Upload documents first to start chatting" : 
+                        "Select or create a chat to begin"
+                      }
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </main>
+        </div>
+      </div>
 
       <footer className="app-footer">
         <p>
