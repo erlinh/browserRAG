@@ -1,17 +1,28 @@
 import { useState, useRef, ChangeEvent } from 'react';
 import { processPdfDocument, processCsvDocument } from '../services/documentService';
+import { DocumentInfo } from '../services/documentManagementService';
 import './DocumentUpload.css';
 
 interface DocumentUploadProps {
   isDbReady: boolean;
-  documents: string[];
-  onDocumentProcessed: (docName: string) => void;
+  documents: DocumentInfo[];
+  onDocumentProcessed: (documentId: string, documentName: string) => void;
+  onDeleteDocument: (documentId: string) => void;
+  currentPage: number;
+  totalDocuments: number;
+  pageSize: number;
+  onPageChange: (page: number) => void;
 }
 
 const DocumentUpload: React.FC<DocumentUploadProps> = ({ 
   isDbReady, 
   documents, 
-  onDocumentProcessed 
+  onDocumentProcessed,
+  onDeleteDocument,
+  currentPage,
+  totalDocuments,
+  pageSize,
+  onPageChange
 }) => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
@@ -43,11 +54,11 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
         
         if (fileType === 'pdf') {
           setProcessingStatus('Processing PDF document...');
-          await processPdfDocument(file, (progress: number) => {
+          const documentId = await processPdfDocument(file, (progress: number) => {
             // Map processing progress from 0-100 to 50-100 for the total progress
             setUploadProgress(50 + Math.round(progress * 0.5));
           });
-          onDocumentProcessed(fileName);
+          onDocumentProcessed(documentId, fileName);
         } else if (fileType === 'csv') {
           setProcessingStatus('Processing CSV document...');
           
@@ -56,7 +67,7 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
           const estimatedChunks = Math.ceil(file.size / 50000); // Rough estimate based on file size
           setTotalChunks(estimatedChunks > 0 ? estimatedChunks : 1);
           
-          await processCsvDocument(file, (progress: number, chunkInfo?: { current: number, total: number }) => {
+          const documentId = await processCsvDocument(file, (progress: number, chunkInfo?: { current: number, total: number }) => {
             // If we have chunk info, update the status message
             if (chunkInfo) {
               setCurrentChunk(chunkInfo.current);
@@ -73,7 +84,7 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
             // Calculate overall progress, balancing between parsing (50%) and embedding (50%)
             setUploadProgress(50 + Math.round(progress * 0.5));
           });
-          onDocumentProcessed(fileName);
+          onDocumentProcessed(documentId, fileName);
         } else {
           throw new Error(`Unsupported file type: ${fileType}. Please upload PDF or CSV files only.`);
         }
@@ -100,6 +111,59 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
     } finally {
       setIsProcessing(false);
     }
+  };
+
+  const handleDeleteClick = (documentId: string) => {
+    if (window.confirm('Are you sure you want to delete this document?')) {
+      onDeleteDocument(documentId);
+    }
+  };
+
+  // Calculate pagination values
+  const totalPages = Math.ceil(totalDocuments / pageSize);
+  
+  const renderPagination = () => {
+    if (totalPages <= 1) return null;
+    
+    return (
+      <div className="pagination">
+        <button 
+          onClick={() => onPageChange(1)}
+          disabled={currentPage === 1}
+          className="pagination-button"
+        >
+          &laquo;
+        </button>
+        
+        <button 
+          onClick={() => onPageChange(currentPage - 1)}
+          disabled={currentPage === 1}
+          className="pagination-button"
+        >
+          &lsaquo;
+        </button>
+        
+        <span className="pagination-info">
+          Page {currentPage} of {totalPages}
+        </span>
+        
+        <button 
+          onClick={() => onPageChange(currentPage + 1)}
+          disabled={currentPage === totalPages}
+          className="pagination-button"
+        >
+          &rsaquo;
+        </button>
+        
+        <button 
+          onClick={() => onPageChange(totalPages)}
+          disabled={currentPage === totalPages}
+          className="pagination-button"
+        >
+          &raquo;
+        </button>
+      </div>
+    );
   };
 
   return (
@@ -157,16 +221,40 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
         )}
       </div>
 
-      {documents.length > 0 && (
+      {documents.length > 0 || totalDocuments > 0 ? (
         <div className="documents-list">
           <h3>Uploaded Documents</h3>
-          <ul>
-            {documents.map((doc, index) => (
-              <li key={index}>{doc}</li>
-            ))}
-          </ul>
+          {documents.length > 0 ? (
+            <>
+              <ul>
+                {documents.map((doc) => (
+                  <li key={doc.id} className="document-item">
+                    <div className="document-info">
+                      <span className="document-name">{doc.name}</span>
+                      <span className="document-type">{doc.type.toUpperCase()}</span>
+                      <span className="document-date">
+                        {new Date(doc.createdAt).toLocaleDateString()}
+                      </span>
+                    </div>
+                    <button 
+                      className="delete-button"
+                      onClick={() => handleDeleteClick(doc.id)}
+                      aria-label="Delete document"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" height="16" width="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M3 6h18M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path>
+                      </svg>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+              {renderPagination()}
+            </>
+          ) : (
+            <p className="no-documents">No documents on this page</p>
+          )}
         </div>
-      )}
+      ) : null}
     </div>
   );
 };
