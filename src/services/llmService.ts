@@ -127,10 +127,12 @@ export const initializeLLM = async (
     const tokenizer = await AutoTokenizer.from_pretrained(modelId, {
       progress_callback: (progress: any) => {
         if (progressCallback && progress.progress) {
+          // Clamp progress value between 0 and 1
+          const clampedProgress = Math.max(0, Math.min(1, progress.progress));
           progressCallback({
             status: 'loading',
-            message: `Loading tokenizer (${Math.round(progress.progress * 100)}%)`,
-            progress: progress.progress * 30,
+            message: `Loading tokenizer (${Math.round(clampedProgress * 100)}%)`,
+            progress: clampedProgress * 30,
             stage: 'tokenizer'
           });
         }
@@ -155,10 +157,12 @@ export const initializeLLM = async (
       device: device,
       progress_callback: (progress: any) => {
         if (progressCallback && progress.progress) {
+          // Clamp progress value between 0 and 1
+          const clampedProgress = Math.max(0, Math.min(1, progress.progress));
           progressCallback({
             status: 'loading',
-            message: `Loading LLM model (${Math.round(progress.progress * 100)}%)`,
-            progress: 30 + progress.progress * 50,
+            message: `Loading LLM model (${Math.round(clampedProgress * 100)}%)`,
+            progress: 30 + clampedProgress * 50,
             stage: 'model'
           });
         }

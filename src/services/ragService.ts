@@ -83,9 +83,11 @@ export const queryDocuments = async (
       (progress) => {
         if (progressCallback) {
           // Scale the progress to be between 50-100%
-          const scaledProgress = progress.progress !== undefined
-            ? 50 + (progress.progress * 0.5)
-            : undefined;
+          const clampedProgress = progress.progress !== undefined
+            ? Math.max(0, Math.min(1, progress.progress)) // Clamp between 0 and 1
+            : 0;
+          
+          const scaledProgress = 50 + (clampedProgress * 50);
           
           progressCallback({
             ...progress,

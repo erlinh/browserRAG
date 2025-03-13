@@ -116,4 +116,26 @@ input:checked + .toggle-slider:before {
   font-weight: 600;
   margin-left: 8px;
   min-width: 60px;
+}
+
+/* WebGPU disclaimer styles */
+.webgpu-disclaimer {
+  background-color: rgba(220, 38, 38, 0.1);
+  border: 1px solid rgba(220, 38, 38, 0.3);
+  border-radius: 6px;
+  padding: 10px 12px;
+  margin-top: 12px;
+  width: 100%;
+}
+
+.webgpu-disclaimer p {
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 13px;
+  margin: 0;
+  line-height: 1.4;
+}
+
+.toggle-switch.disabled {
+  opacity: 0.6;
+  pointer-events: none;
 } 
