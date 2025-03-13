@@ -1,38 +1,26 @@
 import React from 'react';
 import './ProgressBar.css';
 
-interface ProgressBarProps {
+export interface ProgressInfo {
+  stage: string;
   progress: number;
-  status: 'idle' | 'loading' | 'success' | 'error';
-  message: string;
-  stage?: string;
 }
 
-const ProgressBar: React.FC<ProgressBarProps> = ({ progress, status, message, stage }) => {
-  // Don't show if idle or 0 progress
-  if (status === 'idle' || (progress === 0 && status !== 'loading')) {
+interface ProgressBarProps {
+  info: ProgressInfo;
+}
+
+const ProgressBar: React.FC<ProgressBarProps> = ({ info }) => {
+  // Don't show if no progress info
+  if (!info || info.progress === 0) {
     return null;
   }
 
-  // Determine progress bar color based on status
-  const getProgressColor = () => {
-    switch (status) {
-      case 'loading':
-        return 'var(--progress-loading-color)';
-      case 'success':
-        return 'var(--progress-success-color)';
-      case 'error':
-        return 'var(--progress-error-color)';
-      default:
-        return 'var(--progress-loading-color)';
-    }
-  };
-
   // Get stage display name
   const getStageName = () => {
-    if (!stage) return '';
+    if (!info.stage) return '';
     
-    switch (stage) {
+    switch (info.stage) {
       case 'tokenizer':
         return 'Loading Tokenizer';
       case 'model':
@@ -53,28 +41,50 @@ const ProgressBar: React.FC<ProgressBarProps> = ({ progress, status, message, st
         return 'Complete';
       case 'error':
         return 'Error';
+      case 'initialization':
+        return 'Initializing';
       default:
-        return stage.charAt(0).toUpperCase() + stage.slice(1);
+        return info.stage.charAt(0).toUpperCase() + info.stage.slice(1);
+    }
+  };
+
+  // Get message based on stage
+  const getMessage = () => {
+    switch (info.stage) {
+      case 'embedding':
+        return 'Generating embeddings for your question...';
+      case 'retrieval':
+        return 'Retrieving relevant context from documents...';
+      case 'generation':
+        return 'Generating response...';
+      case 'complete':
+        return 'Complete!';
+      case 'error':
+        return 'An error occurred';
+      case 'initialization':
+        return 'Initializing...';
+      default:
+        return 'Processing...';
     }
   };
 
   // Calculate progress percentage with bounds checking
-  const clampedProgress = Math.max(0, Math.min(100, progress));
+  const clampedProgress = Math.max(0, Math.min(100, info.progress));
   const progressPercent = `${Math.round(clampedProgress)}%`;
 
   return (
-    <div className={`progress-container ${status}`}>
+    <div className={`progress-container ${info.stage === 'error' ? 'error' : 'loading'}`}>
       <div className="progress-info">
-        <div className="progress-message">{message}</div>
+        <div className="progress-message">{getMessage()}</div>
         <div className="progress-percentage">{progressPercent}</div>
       </div>
-      {stage && <div className="progress-stage">{getStageName()}</div>}
+      <div className="progress-stage">{getStageName()}</div>
       <div className="progress-bar-outer">
         <div 
           className="progress-bar-inner" 
           style={{ 
             width: progressPercent,
-            backgroundColor: getProgressColor()
+            backgroundColor: info.stage === 'error' ? 'var(--progress-error-color)' : 'var(--progress-loading-color)'
           }}
         />
       </div>

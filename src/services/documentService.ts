@@ -3,7 +3,8 @@ import Papa from 'papaparse';
 import { v4 as uuidv4 } from 'uuid';
 import { generateEmbeddings } from './embeddingService';
 import { storeEmbeddings } from './vectorStore';
-import { addDocument } from './documentManagementService';
+import { DocumentInfo } from './documentManagementService';
+import { addDocumentToProject } from './projectService';
 
 // Initialize PDF.js worker
 pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.js`;
@@ -14,6 +15,7 @@ interface DocumentChunk {
   metadata: {
     documentId: string;
     documentName: string;
+    projectId: string;
     chunkIndex: number;
     pageNumber?: number;
     rowIndex?: number;
@@ -72,9 +74,10 @@ const chunkText = (text: string, chunkSize: number = 1000, overlap: number = 200
  * Process a PDF document
  */
 export const processPdfDocument = async (
+  projectId: string,
   file: File,
   progressCallback?: (progress: number) => void
-): Promise<string> => {
+): Promise<DocumentInfo> => {
   const documentId = uuidv4();
   const fileName = file.name;
   
@@ -113,6 +116,7 @@ export const processPdfDocument = async (
           metadata: {
             documentId,
             documentName: fileName,
+            projectId,
             pageNumber: i,
             chunkIndex: chunks.length,
           }
@@ -142,14 +146,22 @@ export const processPdfDocument = async (
       chunks.map(chunk => chunk.metadata)
     );
     
-    // Add to document management
-    addDocument(documentId, fileName);
+    // Create document info
+    const documentInfo: DocumentInfo = {
+      id: documentId,
+      name: fileName,
+      createdAt: new Date(),
+      type: 'pdf'
+    };
+    
+    // Add to project
+    addDocumentToProject(projectId, documentInfo);
     
     if (progressCallback) {
       progressCallback(100);
     }
     
-    return documentId;
+    return documentInfo;
     
   } catch (error) {
     console.error(`Error processing PDF document ${fileName}:`, error);
@@ -161,13 +173,16 @@ export const processPdfDocument = async (
  * Process a CSV document
  */
 export const processCsvDocument = async (
+  projectId: string,
   file: File,
   progressCallback?: (progress: number, chunkInfo?: { current: number, total: number }) => void
-): Promise<string> => {
+): Promise<DocumentInfo> => {
   const documentId = uuidv4();
   const fileName = file.name;
   
-  return new Promise<string>((resolve, reject) => {
+  console.log(`Starting CSV processing for file: ${fileName}, size: ${file.size} bytes`);
+  
+  return new Promise<DocumentInfo>((resolve, reject) => {
     // Use incremental processing for large files
     const chunkSize = 100; // Process chunks of 100 rows at a time
     let currentChunk: DocumentChunk[] = [];
@@ -177,12 +192,16 @@ export const processCsvDocument = async (
     let chunkCounter = 0;
     let estimatedTotalChunks = 0;
     
+    console.log(`Configuring Papa.parse for CSV file: ${fileName}`);
+    
     Papa.parse(file, {
       header: true,
       skipEmptyLines: true,
       step: function(results, parser) {
         try {
+          console.log(`Parsing CSV row, results:`, results);
           if (!results.data || typeof results.data !== 'object') {
+            console.log(`Invalid CSV row data:`, results.data);
             return;
           }
           
@@ -218,6 +237,7 @@ export const processCsvDocument = async (
               metadata: {
                 documentId,
                 documentName: fileName,
+                projectId,
                 rowIndex: processedRows,
                 chunkIndex: processedRows,
               }
@@ -241,7 +261,7 @@ export const processCsvDocument = async (
             }
             
             // Process the chunk
-            processChunk(chunksToProcess, documentId, fileName, chunkCounter, estimatedTotalChunks, progressCallback)
+            processChunk(chunksToProcess, documentId, fileName, projectId, chunkCounter, estimatedTotalChunks, progressCallback)
               .then(() => {
                 // Resume parsing
                 parser.resume();
@@ -260,6 +280,7 @@ export const processCsvDocument = async (
       },
       complete: async function(results) {
         try {
+          console.log(`CSV parsing complete, results:`, results);
           // Process any remaining rows
           if (currentChunk.length > 0) {
             chunkCounter++;
@@ -268,7 +289,7 @@ export const processCsvDocument = async (
               progressCallback(0, { current: chunkCounter, total: estimatedTotalChunks });
             }
             
-            await processChunk(currentChunk, documentId, fileName, chunkCounter, estimatedTotalChunks, progressCallback);
+            await processChunk(currentChunk, documentId, fileName, projectId, chunkCounter, estimatedTotalChunks, progressCallback);
           }
           
           console.log(`Processed ${processedRows} rows from ${fileName}`);
@@ -277,10 +298,19 @@ export const processCsvDocument = async (
             progressCallback(100);
           }
           
-          // Add to document management
-          addDocument(documentId, fileName);
+          // Create document info
+          const documentInfo: DocumentInfo = {
+            id: documentId,
+            name: fileName,
+            createdAt: new Date(),
+            type: 'csv'
+          };
           
-          resolve(documentId);
+          // Add to project
+          addDocumentToProject(projectId, documentInfo);
+          
+          console.log(`CSV document successfully processed: ${fileName}`);
+          resolve(documentInfo);
         } catch (error) {
           console.error(`Error finalizing CSV document ${fileName}:`, error);
           reject(error);
@@ -288,6 +318,7 @@ export const processCsvDocument = async (
       },
       error: function(error) {
         console.error(`Error parsing CSV document ${fileName}:`, error);
+        console.error(`Error details:`, error.message, error.name, error.stack);
         reject(error);
       }
     });
@@ -301,6 +332,7 @@ async function processChunk(
   chunk: DocumentChunk[],
   documentId: string,
   fileName: string,
+  projectId: string,
   chunkNumber: number,
   totalChunks: number,
   progressCallback?: (progress: number, chunkInfo?: { current: number, total: number }) => void

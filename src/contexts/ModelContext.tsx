@@ -1,5 +1,7 @@
 import React, { createContext, useState, useContext, ReactNode, useEffect } from 'react';
 import { getUseWebGPU, setUseWebGPU } from '../services/llmService';
+import { ProgressInfo } from '../components/ProgressBar';
+import { getSelectedModel, setSelectedModel as persistSelectedModel, ModelInfo } from '../services/modelPersistenceService';
 
 // Define the available models
 export interface ModelOption {
@@ -20,20 +22,12 @@ export const MODEL_OPTIONS: ModelOption[] = [
   }
 ];
 
-// Define progress information interface
-export interface ProgressInfo {
-  status: 'idle' | 'loading' | 'success' | 'error';
-  message: string;
-  progress?: number;
-  stage?: string;
-}
-
 // Define context interface
 interface ModelContextType {
   selectedModel: ModelOption;
   setSelectedModel: (model: ModelOption) => void;
-  progressInfo: ProgressInfo;
-  setProgressInfo: (info: ProgressInfo) => void;
+  progressInfo: ProgressInfo | null;
+  setProgressInfo: (info: ProgressInfo | null) => void;
   useWebGPU: boolean;
   setUseWebGPU: (enabled: boolean) => void;
 }
@@ -42,7 +36,7 @@ interface ModelContextType {
 const ModelContext = createContext<ModelContextType>({
   selectedModel: MODEL_OPTIONS[0], // Default model
   setSelectedModel: () => {},
-  progressInfo: { status: 'idle', message: '', progress: 0 },
+  progressInfo: null,
   setProgressInfo: () => {},
   useWebGPU: true, // Default to true (using WebGPU)
   setUseWebGPU: () => {},
@@ -50,18 +44,24 @@ const ModelContext = createContext<ModelContextType>({
 
 // Create provider component
 export const ModelProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const [selectedModel, setSelectedModel] = useState<ModelOption>(MODEL_OPTIONS[0]);
-  const [progressInfo, setProgressInfo] = useState<ProgressInfo>({
-    status: 'idle',
-    message: '',
-    progress: 0,
-  });
+  const [selectedModel, setSelectedModelState] = useState<ModelOption>(MODEL_OPTIONS[0]);
+  const [progressInfo, setProgressInfo] = useState<ProgressInfo | null>(null);
   const [useWebGPUState, setUseWebGPUState] = useState<boolean>(true);
 
   // Initialize the WebGPU state from the service
   useEffect(() => {
     // Get the initial value from service
     setUseWebGPUState(getUseWebGPU());
+    
+    // Get the selected model from persistence
+    const persistedModel = getSelectedModel();
+    if (persistedModel) {
+      // Find matching model in options
+      const matchingModel = MODEL_OPTIONS.find(m => m.id === persistedModel.id);
+      if (matchingModel) {
+        setSelectedModelState(matchingModel);
+      }
+    }
   }, []);
   
   // Update the service when state changes
@@ -69,12 +69,28 @@ export const ModelProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     setUseWebGPUState(enabled);
     setUseWebGPU(enabled);
   };
+  
+  // Handle model selection with persistence
+  const handleModelSelection = (model: ModelOption) => {
+    setSelectedModelState(model);
+    
+    // Persist the selection
+    const modelInfo: ModelInfo = {
+      id: model.id,
+      name: model.name,
+      type: 'onnx',
+      isDownloaded: true,
+      lastUsed: new Date()
+    };
+    
+    persistSelectedModel(model.id);
+  };
 
   return (
     <ModelContext.Provider
       value={{
         selectedModel,
-        setSelectedModel,
+        setSelectedModel: handleModelSelection,
         progressInfo,
         setProgressInfo,
         useWebGPU: useWebGPUState,

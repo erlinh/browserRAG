@@ -1,9 +1,29 @@
 import { useState, useEffect } from 'react';
 import DocumentUpload from './components/DocumentUpload';
 import Chat from './components/Chat';
-import { initializeVectorStore } from './services/vectorStore';
+import ProjectSelector from './components/ProjectSelector';
+import ChatList from './components/ChatList';
+import { initializeVectorStore, deleteDocumentChunks } from './services/vectorStore';
 import { useModel } from './contexts/ModelContext';
-import { getDocuments, DocumentInfo, deleteDocument } from './services/documentManagementService';
+import { 
+  getDocuments, 
+  DocumentInfo, 
+  deleteDocument
+} from './services/documentManagementService';
+import { 
+  getAllProjects as getProjects, 
+  Project, 
+  createProject,
+  getProjectDocuments,
+  getProjectChatSessions,
+  createChatSession,
+  deleteChatSession,
+  renameChatSession,
+  getChatSessionById,
+  ChatSession,
+  initializeProjectData,
+  deleteDocumentFromProject
+} from './services/projectService';
 import './App.css';
 
 function App() {
@@ -14,11 +34,25 @@ function App() {
   const [totalDocuments, setTotalDocuments] = useState(0);
   const [pageSize] = useState(5); // Number of documents per page
   const { selectedModel } = useModel();
+  
+  // Project state
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [selectedProject, setSelectedProject] = useState<Project | null>(null);
+  
+  // Chat state
+  const [chatSessions, setChatSessions] = useState<ChatSession[]>([]);
+  const [selectedChatId, setSelectedChatId] = useState<string | null>(null);
+  const [selectedChatSession, setSelectedChatSession] = useState<ChatSession | null>(null);
 
   useEffect(() => {
     const setupDatabase = async () => {
       try {
+        // Initialize Vector Store
         await initializeVectorStore();
+        
+        // Initialize project data
+        initializeProjectData();
+        
         setIsDbReady(true);
       } catch (error) {
         console.error('Failed to initialize database:', error);
@@ -28,29 +62,79 @@ function App() {
     setupDatabase();
   }, []);
 
-  // Load documents when page changes
+  // Load projects
   useEffect(() => {
-    const loadDocuments = () => {
-      const result = getDocuments(currentPage, pageSize);
-      setDocuments(result.documents);
-      setTotalDocuments(result.total);
-    };
+    if (isDbReady) {
+      const availableProjects = getProjects();
+      setProjects(availableProjects);
+      
+      // Select first project by default if available
+      if (availableProjects.length > 0 && !selectedProject) {
+        setSelectedProject(availableProjects[0]);
+      }
+    }
+  }, [isDbReady, selectedProject]);
 
-    loadDocuments();
-  }, [currentPage, pageSize]);
+  // Load documents when project or page changes
+  useEffect(() => {
+    if (selectedProject) {
+      const loadDocuments = () => {
+        const result = getProjectDocuments(selectedProject.id, currentPage, pageSize);
+        setDocuments(result.documents);
+        setTotalDocuments(result.total);
+      };
+
+      loadDocuments();
+    } else {
+      setDocuments([]);
+      setTotalDocuments(0);
+    }
+  }, [currentPage, pageSize, selectedProject]);
+
+  // Load chat sessions when project changes
+  useEffect(() => {
+    if (selectedProject) {
+      const sessions = getProjectChatSessions(selectedProject.id);
+      setChatSessions(sessions);
+      setSelectedChatId(sessions.length > 0 ? sessions[0].id : null);
+    } else {
+      setChatSessions([]);
+      setSelectedChatId(null);
+    }
+  }, [selectedProject]);
+
+  // Update selected chat session when chat ID changes
+  useEffect(() => {
+    if (selectedProject && selectedChatId) {
+      const chatSession = getChatSessionById(selectedProject.id, selectedChatId);
+      setSelectedChatSession(chatSession);
+    } else {
+      setSelectedChatSession(null);
+    }
+  }, [selectedProject, selectedChatId]);
 
   const handleDocumentUpload = (documentId: string, documentName: string) => {
     // Refresh document list after upload
-    const result = getDocuments(currentPage, pageSize);
-    setDocuments(result.documents);
-    setTotalDocuments(result.total);
+    if (selectedProject) {
+      const result = getProjectDocuments(selectedProject.id, currentPage, pageSize);
+      setDocuments(result.documents);
+      setTotalDocuments(result.total);
+    }
   };
 
   const handleDeleteDocument = (documentId: string) => {
-    const success = deleteDocument(documentId);
+    if (!selectedProject) return;
+    
+    // First, delete from project documents
+    const success = deleteDocumentFromProject(selectedProject.id, documentId);
+    
     if (success) {
+      // Also delete document chunks from vector store
+      const chunksDeleted = deleteDocumentChunks(documentId);
+      console.log(`Deleted ${chunksDeleted} chunks for document ${documentId}`);
+      
       // Refresh document list
-      const result = getDocuments(currentPage, pageSize);
+      const result = getProjectDocuments(selectedProject.id, currentPage, pageSize);
       setDocuments(result.documents);
       setTotalDocuments(result.total);
       
@@ -58,11 +142,70 @@ function App() {
       if (result.documents.length === 0 && currentPage > 1) {
         setCurrentPage(currentPage - 1);
       }
+    } else {
+      console.error(`Failed to delete document ${documentId} from project ${selectedProject.id}`);
     }
   };
 
   const handlePageChange = (newPage: number) => {
     setCurrentPage(newPage);
+  };
+
+  const handleProjectChange = (projectId: string) => {
+    const project = projects.find(p => p.id === projectId);
+    if (project) {
+      setSelectedProject(project);
+      setCurrentPage(1); // Reset to first page when changing projects
+    }
+  };
+
+  const handleCreateProject = (projectName: string, description: string = '') => {
+    const newProject = createProject(projectName, description);
+    setProjects([...projects, newProject]);
+    setSelectedProject(newProject);
+    setCurrentPage(1);
+  };
+
+  const handleDeleteProject = (projectId: string) => {
+    // TODO: Implement project deletion
+    console.log('Deleting project:', projectId);
+  };
+
+  const handleCreateChat = (name: string) => {
+    if (!selectedProject) return;
+    
+    const newChat = createChatSession(selectedProject.id, name);
+    if (newChat) {
+      setChatSessions([...chatSessions, newChat]);
+      setSelectedChatId(newChat.id);
+    }
+  };
+
+  const handleDeleteChat = (chatId: string) => {
+    if (!selectedProject) return;
+    
+    const success = deleteChatSession(selectedProject.id, chatId);
+    if (success) {
+      // Refresh chat list
+      const sessions = getProjectChatSessions(selectedProject.id);
+      setChatSessions(sessions);
+      
+      // If we deleted the selected chat, select another one
+      if (selectedChatId === chatId) {
+        setSelectedChatId(sessions.length > 0 ? sessions[0].id : null);
+      }
+    }
+  };
+
+  const handleRenameChat = (chatId: string, newName: string) => {
+    if (!selectedProject) return;
+    
+    const success = renameChatSession(selectedProject.id, chatId, newName);
+    if (success) {
+      // Refresh chat list
+      const sessions = getProjectChatSessions(selectedProject.id);
+      setChatSessions(sessions);
+    }
   };
 
   // Convert DocumentInfo[] to string[] for Chat component
@@ -74,6 +217,16 @@ function App() {
         <h1>BrowserRAG</h1>
         <p>Chat with your documents entirely in your browser</p>
       </header>
+
+      <div className="project-selector-container">
+        <ProjectSelector 
+          projects={projects} 
+          selectedProjectId={selectedProject?.id || ''} 
+          onSelectProject={handleProjectChange}
+          onCreateProject={handleCreateProject}
+          onDeleteProject={handleDeleteProject}
+        />
+      </div>
 
       <nav className="app-tabs">
         <button 
@@ -102,9 +255,38 @@ function App() {
             totalDocuments={totalDocuments}
             pageSize={pageSize}
             onPageChange={handlePageChange}
+            projectId={selectedProject?.id || ''}
           />
         ) : (
-          <Chat documents={documentNames} />
+          <div className="chat-interface">
+            <div className="chat-sidebar">
+              <ChatList 
+                chats={chatSessions}
+                selectedChatId={selectedChatId}
+                onSelectChat={setSelectedChatId}
+                onCreateChat={handleCreateChat}
+                onDeleteChat={handleDeleteChat}
+                onRenameChat={handleRenameChat}
+              />
+            </div>
+            <div className="chat-main">
+              {selectedChatId && selectedProject && selectedChatSession ? (
+                <Chat 
+                  documents={documentNames} 
+                  chatId={selectedChatId}
+                  projectId={selectedProject.id}
+                  chatSession={selectedChatSession}
+                />
+              ) : (
+                <div className="no-chat-selected">
+                  {totalDocuments === 0 ? 
+                    "Upload documents first to start chatting" : 
+                    "Select or create a chat to begin"
+                  }
+                </div>
+              )}
+            </div>
+          </div>
         )}
       </main>
 

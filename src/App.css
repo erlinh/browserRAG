@@ -80,6 +80,7 @@ body {
   display: flex;
   flex-direction: column;
   background-color: var(--app-bg-color);
+  padding: 1.5rem;
 }
 
 .app-footer {
@@ -95,4 +96,47 @@ body {
   display: block;
   margin-top: 0.5rem;
   color: rgba(255, 255, 255, 0.4);
+}
+
+/* Project-based layout styles */
+.section-title {
+  margin-top: 0;
+  margin-bottom: 1.5rem;
+  font-size: 1.5rem;
+  color: var(--app-text-color);
+}
+
+.project-selector-container {
+  margin: 1.5rem;
+}
+
+.chat-interface {
+  display: flex;
+  gap: 1.5rem;
+  height: 600px;
+}
+
+.chat-sidebar {
+  width: 300px;
+  flex-shrink: 0;
+}
+
+.chat-main {
+  flex: 1;
+  background-color: rgba(255, 255, 255, 0.05);
+  border-radius: 0.5rem;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.no-chat-selected {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  padding: 2rem;
+  text-align: center;
+  color: rgba(255, 255, 255, 0.5);
+  font-style: italic;
 } 

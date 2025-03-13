@@ -6,6 +6,7 @@ import './DocumentUpload.css';
 interface DocumentUploadProps {
   isDbReady: boolean;
   documents: DocumentInfo[];
+  projectId: string;
   onDocumentProcessed: (documentId: string, documentName: string) => void;
   onDeleteDocument: (documentId: string) => void;
   currentPage: number;
@@ -17,6 +18,7 @@ interface DocumentUploadProps {
 const DocumentUpload: React.FC<DocumentUploadProps> = ({ 
   isDbReady, 
   documents, 
+  projectId,
   onDocumentProcessed,
   onDeleteDocument,
   currentPage,
@@ -30,6 +32,7 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
   const [processingStatus, setProcessingStatus] = useState<string>('');
   const [currentChunk, setCurrentChunk] = useState<number>(0);
   const [totalChunks, setTotalChunks] = useState<number>(0);
+  const [processingDetails, setProcessingDetails] = useState<string[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleFileChange = async (e: ChangeEvent<HTMLInputElement>) => {
@@ -42,23 +45,40 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
     setProcessingStatus('');
     setCurrentChunk(0);
     setTotalChunks(0);
+    setProcessingDetails([]);
     
     try {
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
         const fileName = file.name;
-        const fileType = fileName.split('.').pop()?.toLowerCase();
+        const fileExtension = fileName.split('.').pop()?.toLowerCase();
+        const fileType = fileExtension || '';
+        
+        console.log(`Processing file: ${fileName}, detected type: ${fileType}, MIME type: ${file.type}`);
         
         // Update progress
         setUploadProgress(Math.round((i / files.length) * 50));
         
+        // Add processing detail
+        setProcessingDetails(prev => [...prev, `Starting to process ${fileName} (${file.size} bytes)`]);
+        
         if (fileType === 'pdf') {
           setProcessingStatus('Processing PDF document...');
-          const documentId = await processPdfDocument(file, (progress: number) => {
+          const documentInfo = await processPdfDocument(projectId, file, (progress: number) => {
             // Map processing progress from 0-100 to 50-100 for the total progress
             setUploadProgress(50 + Math.round(progress * 0.5));
+            
+            // Add embedding details at key points
+            if (progress === 25) {
+              setProcessingDetails(prev => [...prev, `Extracting text from PDF pages...`]);
+            } else if (progress === 50) {
+              setProcessingDetails(prev => [...prev, `PDF text extracted, generating embeddings...`]);
+            } else if (progress === 75) {
+              setProcessingDetails(prev => [...prev, `Storing document embeddings in vector database...`]);
+            }
           });
-          onDocumentProcessed(documentId, fileName);
+          setProcessingDetails(prev => [...prev, `Document processed and saved with ID: ${documentInfo.id}`]);
+          onDocumentProcessed(documentInfo.id, documentInfo.name);
         } else if (fileType === 'csv') {
           setProcessingStatus('Processing CSV document...');
           
@@ -67,7 +87,7 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
           const estimatedChunks = Math.ceil(file.size / 50000); // Rough estimate based on file size
           setTotalChunks(estimatedChunks > 0 ? estimatedChunks : 1);
           
-          const documentId = await processCsvDocument(file, (progress: number, chunkInfo?: { current: number, total: number }) => {
+          const documentInfo = await processCsvDocument(projectId, file, (progress: number, chunkInfo?: { current: number, total: number }) => {
             // If we have chunk info, update the status message
             if (chunkInfo) {
               setCurrentChunk(chunkInfo.current);
@@ -79,12 +99,18 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
                 processedChunks = chunkInfo.current;
               }
               setProcessingStatus(`Processing CSV (Chunk ${chunkInfo.current} of ${chunkInfo.total === 0 ? 'unknown' : chunkInfo.total})...`);
+              
+              // Add details on chunk processing
+              if (chunkInfo.current % 5 === 0 || chunkInfo.current === 1) {
+                setProcessingDetails(prev => [...prev, `Processing CSV chunk ${chunkInfo.current} of ${chunkInfo.total || 'unknown'}`]);
+              }
             }
             
             // Calculate overall progress, balancing between parsing (50%) and embedding (50%)
             setUploadProgress(50 + Math.round(progress * 0.5));
           });
-          onDocumentProcessed(documentId, fileName);
+          setProcessingDetails(prev => [...prev, `CSV document processed and saved with ID: ${documentInfo.id}`]);
+          onDocumentProcessed(documentInfo.id, documentInfo.name);
         } else {
           throw new Error(`Unsupported file type: ${fileType}. Please upload PDF or CSV files only.`);
         }
@@ -114,7 +140,9 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
   };
 
   const handleDeleteClick = (documentId: string) => {
+    console.log(`Attempting to delete document with ID: ${documentId}`);
     if (window.confirm('Are you sure you want to delete this document?')) {
+      console.log(`Confirmed deletion of document: ${documentId}`);
       onDeleteDocument(documentId);
     }
   };
@@ -217,6 +245,20 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
         {errorMessage && (
           <div className="error-message">
             {errorMessage}
+          </div>
+        )}
+        
+        {processingDetails.length > 0 && (
+          <div className="processing-details">
+            <h4>Processing Details</h4>
+            <details>
+              <summary>Show processing log ({processingDetails.length} events)</summary>
+              <ul className="details-list">
+                {processingDetails.map((detail, index) => (
+                  <li key={index}>{detail}</li>
+                ))}
+              </ul>
+            </details>
           </div>
         )}
       </div>

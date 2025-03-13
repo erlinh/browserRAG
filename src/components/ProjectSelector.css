@@ -1,0 +1,220 @@
+.project-selector {
+  background-color: rgba(255, 255, 255, 0.05);
+  border-radius: 0.5rem;
+  padding: 1.5rem;
+  margin-bottom: 2rem;
+}
+
+.project-selector-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.5rem;
+}
+
+.project-selector-header h2 {
+  margin: 0;
+  font-size: 1.5rem;
+}
+
+.create-project-button {
+  background-color: #3b82f6;
+  color: white;
+  border: none;
+  border-radius: 0.25rem;
+  padding: 0.5rem 1rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.create-project-button:hover {
+  background-color: #2563eb;
+}
+
+.create-project-form {
+  background-color: rgba(255, 255, 255, 0.05);
+  border-radius: 0.5rem;
+  padding: 1.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.project-input,
+.project-textarea {
+  width: 100%;
+  padding: 0.75rem;
+  margin-bottom: 1rem;
+  background-color: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 0.25rem;
+  color: white;
+  font-size: 1rem;
+}
+
+.project-textarea {
+  min-height: 100px;
+  resize: vertical;
+}
+
+.project-form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+}
+
+.cancel-button {
+  background-color: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: #e5e7eb;
+  border-radius: 0.25rem;
+  padding: 0.5rem 1rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.cancel-button:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+.create-button {
+  background-color: #3b82f6;
+  color: white;
+  border: none;
+  border-radius: 0.25rem;
+  padding: 0.5rem 1rem;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.create-button:hover:not(:disabled) {
+  background-color: #2563eb;
+}
+
+.create-button:disabled {
+  background-color: #9ca3af;
+  cursor: not-allowed;
+}
+
+.projects-list ul {
+  list-style-type: none;
+  margin: 0;
+  padding: 0;
+}
+
+.project-item {
+  background-color: rgba(255, 255, 255, 0.05);
+  border-radius: 0.5rem;
+  margin-bottom: 1rem;
+  overflow: hidden;
+}
+
+.project-item.selected {
+  border: 1px solid #3b82f6;
+  background-color: rgba(59, 130, 246, 0.1);
+}
+
+.project-item-content {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.project-item-content:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+.project-info {
+  flex: 1;
+}
+
+.project-name {
+  margin: 0 0 0.5rem 0;
+  font-size: 1.25rem;
+}
+
+.project-description {
+  margin: 0 0 0.5rem 0;
+  color: #9ca3af;
+  font-size: 0.875rem;
+}
+
+.project-date {
+  margin: 0;
+  color: #9ca3af;
+  font-size: 0.75rem;
+}
+
+.delete-project-button {
+  background-color: transparent;
+  border: none;
+  color: #9ca3af;
+  cursor: pointer;
+  padding: 0.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.25rem;
+  transition: all 0.2s;
+  margin-left: 0.5rem;
+}
+
+.delete-project-button:hover {
+  color: #ef4444;
+  background-color: rgba(239, 68, 68, 0.1);
+}
+
+.delete-confirmation {
+  background-color: rgba(239, 68, 68, 0.1);
+  padding: 1rem;
+  border-top: 1px solid rgba(239, 68, 68, 0.2);
+}
+
+.delete-confirmation p {
+  margin: 0 0 0.75rem 0;
+  color: #ef4444;
+  font-weight: 500;
+}
+
+.delete-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+}
+
+.cancel-delete {
+  background-color: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: #e5e7eb;
+  border-radius: 0.25rem;
+  padding: 0.5rem 1rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.cancel-delete:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+.confirm-delete {
+  background-color: #ef4444;
+  color: white;
+  border: none;
+  border-radius: 0.25rem;
+  padding: 0.5rem 1rem;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.confirm-delete:hover {
+  background-color: #dc2626;
+}
+
+.no-projects {
+  text-align: center;
+  padding: 2rem 0;
+  color: #9ca3af;
+  font-style: italic;
+} 

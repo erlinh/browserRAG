@@ -1,0 +1,228 @@
+.chat-list {
+  background-color: rgba(255, 255, 255, 0.05);
+  border-radius: 0.5rem;
+  padding: 1.5rem;
+  margin-bottom: 2rem;
+}
+
+.chat-list-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.5rem;
+}
+
+.chat-list-header h3 {
+  margin: 0;
+  font-size: 1.25rem;
+}
+
+.create-chat-button {
+  background-color: #3b82f6;
+  color: white;
+  border: none;
+  border-radius: 0.25rem;
+  padding: 0.5rem 1rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.create-chat-button:hover {
+  background-color: #2563eb;
+}
+
+.create-chat-form {
+  background-color: rgba(255, 255, 255, 0.05);
+  border-radius: 0.5rem;
+  padding: 1rem;
+  margin-bottom: 1rem;
+}
+
+.chat-input {
+  width: 100%;
+  padding: 0.75rem;
+  margin-bottom: 1rem;
+  background-color: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 0.25rem;
+  color: white;
+  font-size: 1rem;
+}
+
+.chat-form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+}
+
+.cancel-button {
+  background-color: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: #e5e7eb;
+  border-radius: 0.25rem;
+  padding: 0.5rem 1rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.cancel-button:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+.create-button, .save-button {
+  background-color: #3b82f6;
+  color: white;
+  border: none;
+  border-radius: 0.25rem;
+  padding: 0.5rem 1rem;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.create-button:hover:not(:disabled), .save-button:hover:not(:disabled) {
+  background-color: #2563eb;
+}
+
+.create-button:disabled, .save-button:disabled {
+  background-color: #9ca3af;
+  cursor: not-allowed;
+}
+
+.chats-container ul {
+  list-style-type: none;
+  margin: 0;
+  padding: 0;
+}
+
+.chat-item {
+  background-color: rgba(255, 255, 255, 0.05);
+  border-radius: 0.5rem;
+  margin-bottom: 0.75rem;
+  overflow: hidden;
+}
+
+.chat-item.selected {
+  border: 1px solid #3b82f6;
+  background-color: rgba(59, 130, 246, 0.1);
+}
+
+.chat-item-content {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.75rem 1rem;
+}
+
+.chat-info {
+  flex: 1;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.chat-info:hover {
+  opacity: 0.8;
+}
+
+.chat-name {
+  margin: 0 0 0.25rem 0;
+  font-size: 1rem;
+  font-weight: 500;
+}
+
+.chat-date {
+  margin: 0;
+  color: #9ca3af;
+  font-size: 0.75rem;
+}
+
+.chat-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.edit-chat-button, .delete-chat-button {
+  background-color: transparent;
+  border: none;
+  color: #9ca3af;
+  cursor: pointer;
+  padding: 0.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.25rem;
+  transition: all 0.2s;
+}
+
+.edit-chat-button:hover {
+  color: #3b82f6;
+  background-color: rgba(59, 130, 246, 0.1);
+}
+
+.delete-chat-button:hover {
+  color: #ef4444;
+  background-color: rgba(239, 68, 68, 0.1);
+}
+
+.edit-chat-form {
+  padding: 1rem;
+}
+
+.edit-chat-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+}
+
+.delete-confirmation {
+  background-color: rgba(239, 68, 68, 0.1);
+  padding: 1rem;
+  border-top: 1px solid rgba(239, 68, 68, 0.2);
+}
+
+.delete-confirmation p {
+  margin: 0 0 0.75rem 0;
+  color: #ef4444;
+  font-weight: 500;
+}
+
+.delete-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+}
+
+.cancel-delete {
+  background-color: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: #e5e7eb;
+  border-radius: 0.25rem;
+  padding: 0.5rem 1rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.cancel-delete:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+.confirm-delete {
+  background-color: #ef4444;
+  color: white;
+  border: none;
+  border-radius: 0.25rem;
+  padding: 0.5rem 1rem;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.confirm-delete:hover {
+  background-color: #dc2626;
+}
+
+.no-chats {
+  text-align: center;
+  padding: 1.5rem 0;
+  color: #9ca3af;
+  font-style: italic;
+} 

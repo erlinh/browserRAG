@@ -1,13 +1,15 @@
 import { useState, useRef, useEffect } from 'react';
 import { queryDocuments, ProgressCallback } from '../services/ragService';
-import { useModel, ProgressInfo } from '../contexts/ModelContext';
+import { useModel } from '../contexts/ModelContext';
+import { ChatSession, ChatMessage as StoredChatMessage, addMessageToChatSession } from '../services/projectService';
 import ModelSelector from './ModelSelector';
-import ProgressBar from './ProgressBar';
+import ProgressBar, { ProgressInfo } from './ProgressBar';
+import { ModelInfo } from '../services/modelPersistenceService';
 import './Chat.css';
 
 interface Message {
   id: string;
-  role: 'user' | 'assistant';
+  role: 'user' | 'assistant' | 'system';
   content: string;
   timestamp: Date;
   isThinking?: boolean;
@@ -17,259 +19,290 @@ interface Message {
 
 interface ChatProps {
   documents: string[];
+  projectId: string;
+  chatId: string;
+  chatSession: ChatSession | null;
 }
 
-const Chat: React.FC<ChatProps> = ({ documents }) => {
+const Chat: React.FC<ChatProps> = ({ documents, projectId, chatId, chatSession }) => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const currentQuestionRef = useRef<string | null>(null);
-  const streamingIdRef = useRef<string | null>(null);
   
   // Get model context
   const { selectedModel, progressInfo, setProgressInfo } = useModel();
 
-  // Add initial assistant message
+  // Load messages from chat session
   useEffect(() => {
-    if (messages.length === 0) {
-      setMessages([
-        {
+    if (chatSession) {
+      // Convert stored messages to UI messages
+      const uiMessages: Message[] = chatSession.messages.map(msg => ({
+        id: msg.id,
+        role: msg.role,
+        content: msg.content,
+        timestamp: new Date(msg.timestamp)
+      }));
+      
+      // If there are no messages, add a welcome message
+      if (uiMessages.length === 0) {
+        const welcomeMessage: Message = {
           id: Date.now().toString(),
           role: 'assistant',
-          content: `Hello! I'm ready to answer questions about your ${documents.length} document(s). What would you like to know?`,
+          content: `Hello! I'm ready to answer questions about your ${documents.length} document(s) in the "${chatSession.name}" chat. What would you like to know?`,
           timestamp: new Date(),
-        },
-      ]);
+        };
+        
+        setMessages([welcomeMessage]);
+        
+        // Save welcome message to chat session
+        addMessageToChatSession(
+          projectId,
+          chatId,
+          'assistant',
+          welcomeMessage.content
+        );
+      } else {
+        setMessages(uiMessages);
+      }
     }
-  }, [documents, messages.length]);
+  }, [chatSession, documents.length, projectId, chatId]);
 
   // Scroll to bottom whenever messages change
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  // Setup global thinking event listener
+  // Reset progress info when component unmounts
   useEffect(() => {
-    const handleThinking = (event: CustomEvent) => {
-      if (event.detail && event.detail.text && currentQuestionRef.current) {
-        const questionId = currentQuestionRef.current;
-        const thinkingId = `thinking-${questionId}`;
-        
-        setMessages(prev => {
-          const thinkingMessage = prev.find(m => m.id === thinkingId);
-          if (thinkingMessage) {
-            // Update existing thinking message
-            return prev.map(m => 
-              m.id === thinkingId 
-                ? { ...m, content: event.detail.text } 
-                : m
-            );
-          } else {
-            // Add new thinking message
-            return [
-              ...prev,
-              {
-                id: thinkingId,
-                role: 'assistant',
-                content: event.detail.text,
-                timestamp: new Date(),
-                isThinking: true,
-                thinkingFor: questionId
-              }
-            ];
-          }
-        });
+    return () => {
+      if (setProgressInfo) {
+        setProgressInfo(null);
       }
     };
-
-    window.addEventListener('thinking', handleThinking as EventListener);
-    
-    return () => {
-      window.removeEventListener('thinking', handleThinking as EventListener);
-    };
-  }, []);
-
-  // Stream response token by token
-  const handleStreamToken = (token: string) => {
-    if (streamingIdRef.current) {
-      setMessages(prev => {
-        return prev.map(msg => 
-          msg.id === streamingIdRef.current
-            ? { ...msg, content: msg.content + token }
-            : msg
-        );
-      });
-    }
-  };
+  }, [setProgressInfo]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!input.trim() || isProcessing) return;
 
-    // Reset error and progress
+    const question = input.trim();
+    setInput('');
+    currentQuestionRef.current = question;
     setError(null);
-    setProgressInfo({
-      status: 'idle',
-      message: '',
-      progress: 0
-    });
 
-    // Generate unique ID for this question
-    const questionId = Date.now().toString();
-    currentQuestionRef.current = questionId;
-
+    // Add user message
+    const userMessageId = Date.now().toString();
     const userMessage: Message = {
-      id: questionId,
+      id: userMessageId,
       role: 'user',
-      content: input.trim(),
+      content: question,
       timestamp: new Date(),
     };
-
-    setMessages(prev => [...prev, userMessage]);
-    setInput('');
-    setIsProcessing(true);
     
-    try {
-      // Create streaming response message
-      const streamingId = `stream-${questionId}`;
-      streamingIdRef.current = streamingId;
-      
-      setMessages(prev => [
-        ...prev,
-        {
-          id: streamingId,
-          role: 'assistant',
-          content: '',
-          timestamp: new Date(),
-          isStreaming: true
-        }
-      ]);
+    setMessages(prev => [...prev, userMessage]);
+    
+    // Save user message to chat session
+    addMessageToChatSession(
+      projectId,
+      chatId,
+      'user',
+      question
+    );
 
-      // Define a properly typed progress callback
-      const progressCallback: ProgressCallback = (progress) => {
-        setProgressInfo({
-          status: progress.status as 'idle' | 'loading' | 'success' | 'error',
-          message: progress.message,
-          progress: progress.progress,
-          stage: progress.stage
-        });
+    // Add thinking message
+    const thinkingMessageId = (Date.now() + 1).toString();
+    const thinkingMessage: Message = {
+      id: thinkingMessageId,
+      role: 'assistant',
+      content: 'Thinking...',
+      timestamp: new Date(),
+      isThinking: true,
+      thinkingFor: userMessageId,
+    };
+    
+    setMessages(prev => [...prev, thinkingMessage]);
+    setIsProcessing(true);
+
+    try {
+      // Create a progress callback
+      const progressCallback: ProgressCallback = (stage: string, progress: number) => {
+        if (setProgressInfo) {
+          setProgressInfo({
+            stage,
+            progress,
+          });
+        }
       };
 
-      // Query documents with the selected model and progress updates
+      // Convert ModelOption to ModelInfo
+      const modelInfo: ModelInfo = {
+        id: selectedModel.id,
+        name: selectedModel.name,
+        type: 'onnx',
+        isDownloaded: true
+      };
+
+      // Query documents
       const response = await queryDocuments(
-        userMessage.content, 
-        selectedModel.id,
+        question,
+        documents,
+        modelInfo,
         progressCallback,
-        handleStreamToken
+        projectId
       );
-      
-      // After the final response is complete, update the streaming status
-      streamingIdRef.current = null;
+
+      // Remove thinking message and add assistant response
       setMessages(prev => {
-        return prev.map(msg => 
-          msg.id === streamingId
-            ? { ...msg, isStreaming: false, content: response }
-            : msg
+        const filtered = prev.filter(m => m.id !== thinkingMessageId);
+        const assistantMessage: Message = {
+          id: Date.now().toString(),
+          role: 'assistant',
+          content: response,
+          timestamp: new Date(),
+        };
+        
+        // Save assistant message to chat session
+        addMessageToChatSession(
+          projectId,
+          chatId,
+          'assistant',
+          response
         );
-      });
-      
-      // Convert thinking message to collapsed version if it exists
-      setMessages(prev => {
-        return prev.map(m => 
-          (m.isThinking && m.thinkingFor === questionId) 
-            ? { ...m, isThinking: false } 
-            : m
-        );
+        
+        return [...filtered, assistantMessage];
       });
     } catch (err) {
       console.error('Error querying documents:', err);
-      setError(err instanceof Error ? err.message : 'An error occurred while processing your request');
       
-      // Remove streaming message if it exists
-      if (streamingIdRef.current) {
-        const streamingId = streamingIdRef.current;
-        streamingIdRef.current = null;
+      // Remove thinking message and add error message
+      setMessages(prev => {
+        const filtered = prev.filter(m => m.id !== thinkingMessageId);
+        const errorMessage = err instanceof Error ? err.message : 'An error occurred while processing your question';
+        setError(errorMessage);
         
-        setMessages(prev => 
-          prev.filter(m => m.id !== streamingId).concat({
-            id: `error-${questionId}`,
-            role: 'assistant',
-            content: 'Sorry, I encountered an error processing your request. Please try again.',
-            timestamp: new Date(),
-          })
+        const assistantMessage: Message = {
+          id: Date.now().toString(),
+          role: 'assistant',
+          content: `I'm sorry, I encountered an error: ${errorMessage}`,
+          timestamp: new Date(),
+        };
+        
+        // Save error message to chat session
+        addMessageToChatSession(
+          projectId,
+          chatId,
+          'assistant',
+          assistantMessage.content
         );
-      }
+        
+        return [...filtered, assistantMessage];
+      });
     } finally {
       setIsProcessing(false);
+      if (setProgressInfo) {
+        setProgressInfo(null);
+      }
       currentQuestionRef.current = null;
     }
   };
 
   return (
-    <div className="chat-container">
-      <div className="chat-controls">
+    <div className="chat">
+      <div className="chat-header">
+        <h2>{chatSession?.name || 'Chat'}</h2>
         <ModelSelector />
-        <ProgressBar 
-          progress={progressInfo.progress || 0}
-          status={progressInfo.status}
-          message={progressInfo.message}
-          stage={progressInfo.stage}
-        />
       </div>
       
       <div className="messages-container">
-        {messages.map(message => (
-          <div 
-            key={message.id} 
-            className={`message ${message.role === 'user' ? 'user-message' : 'assistant-message'} ${message.isThinking ? 'thinking-message' : ''} ${message.isStreaming ? 'streaming-message' : ''}`}
-          >
-            {message.isThinking && <div className="thinking-label">Thinking...</div>}
-            <div className="message-content">
-              {message.isStreaming && message.content === '' ? (
-                <div className="typing-indicator">
-                  <span></span>
-                  <span></span>
-                  <span></span>
-                </div>
-              ) : message.isThinking === false ? (
-                <details>
-                  <summary>View thinking process</summary>
-                  <div className="thinking-content">{message.content}</div>
-                </details>
-              ) : (
-                message.content
-              )}
+        <div className="messages">
+          {messages.map((message) => (
+            <div
+              key={message.id}
+              className={`message ${message.role} ${
+                message.isThinking ? 'thinking' : ''
+              } ${message.isStreaming ? 'streaming' : ''}`}
+            >
+              <div className="message-content">
+                {message.isThinking ? (
+                  <div className="thinking-indicator">
+                    <div className="dot"></div>
+                    <div className="dot"></div>
+                    <div className="dot"></div>
+                  </div>
+                ) : (
+                  message.content
+                )}
+              </div>
+              <div className="message-timestamp">
+                {message.timestamp.toLocaleTimeString()}
+              </div>
             </div>
-            <div className="message-timestamp">
-              {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-            </div>
-          </div>
-        ))}
-        <div ref={messagesEndRef} />
+          ))}
+          <div ref={messagesEndRef} />
+        </div>
       </div>
 
-      <form onSubmit={handleSubmit} className="chat-input-form">
-        {error && <div className="error-message">{error}</div>}
-        <div className="input-container">
-          <input
-            type="text"
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            placeholder="Ask a question about your documents..."
-            disabled={isProcessing}
-            className="chat-input"
-          />
-          <button 
-            type="submit" 
-            disabled={isProcessing || !input.trim()}
-            className="send-button"
-          >
-            {isProcessing ? '...' : 'Send'}
-          </button>
-        </div>
+      {progressInfo && <ProgressBar info={progressInfo} />}
+
+      <form className="chat-input-form" onSubmit={handleSubmit}>
+        <input
+          type="text"
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          placeholder="Ask a question about your documents..."
+          disabled={isProcessing}
+          className="chat-input"
+        />
+        <button
+          type="submit"
+          disabled={!input.trim() || isProcessing}
+          className="send-button"
+        >
+          {isProcessing ? (
+            <span className="spinner"></span>
+          ) : (
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="24"
+              height="24"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <line x1="22" y1="2" x2="11" y2="13"></line>
+              <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+            </svg>
+          )}
+        </button>
       </form>
+
+      {error && <div className="error-message">{error}</div>}
+      
+      {messages.some(m => m.content.includes("I couldn't find any relevant information")) && (
+        <div className="no-results-help">
+          <details>
+            <summary>Document Query Troubleshooting</summary>
+            <div className="troubleshooting-content">
+              <h4>Tips for Better Results:</h4>
+              <ul>
+                <li>Check if your document contains the information you're looking for</li>
+                <li>Try rephrasing your question using terms that appear in your document</li>
+                <li>Check the document upload logs for any issues during processing</li>
+                <li>Try uploading the document again to ensure it was properly indexed</li>
+                <li>For PDFs, ensure they contain searchable text (not just scanned images)</li>
+                <li>For CSVs, ensure they're properly formatted with headers</li>
+              </ul>
+              <p><strong>Document Names:</strong> {documents.join(', ')}</p>
+            </div>
+          </details>
+        </div>
+      )}
     </div>
   );
 };

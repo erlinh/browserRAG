@@ -50,7 +50,7 @@ const ModelSelector: React.FC = () => {
   }, [useWebGPU, isWebGPUSupported]);
   
   // Disable selection during loading
-  const isDisabled = progressInfo.status === 'loading';
+  const isDisabled = progressInfo && 'status' in progressInfo && progressInfo.status === 'loading';
 
   const handleModelChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const modelId = e.target.value;
@@ -86,7 +86,7 @@ const ModelSelector: React.FC = () => {
         id="model-select"
         value={selectedModel.id}
         onChange={handleModelChange}
-        disabled={isDisabled}
+        disabled={isDisabled === true}
         className="model-select"
       >
         {MODEL_OPTIONS.map(model => (
