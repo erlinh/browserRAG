@@ -36,13 +36,13 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
         setUploadProgress(Math.round((i / files.length) * 50));
         
         if (fileType === 'pdf') {
-          await processPdfDocument(file, (progress) => {
+          await processPdfDocument(file, (progress: number) => {
             // Map processing progress from 0-100 to 50-100 for the total progress
             setUploadProgress(50 + Math.round(progress * 0.5));
           });
           onDocumentProcessed(fileName);
         } else if (fileType === 'csv') {
-          await processCsvDocument(file, (progress) => {
+          await processCsvDocument(file, (progress: number) => {
             setUploadProgress(50 + Math.round(progress * 0.5));
           });
           onDocumentProcessed(fileName);

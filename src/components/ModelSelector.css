@@ -118,6 +118,11 @@ input:checked + .toggle-slider:before {
   min-width: 60px;
 }
 
+.toggle-status.status-warning {
+  color: rgba(245, 158, 11, 0.9);
+  font-weight: bold;
+}
+
 /* WebGPU disclaimer styles */
 .webgpu-disclaimer {
   background-color: rgba(220, 38, 38, 0.1);
@@ -129,6 +134,23 @@ input:checked + .toggle-slider:before {
 }
 
 .webgpu-disclaimer p {
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 13px;
+  margin: 0;
+  line-height: 1.4;
+}
+
+/* WebGPU warning styles for when WebGPU is manually disabled */
+.webgpu-warning {
+  background-color: rgba(245, 158, 11, 0.1);
+  border: 1px solid rgba(245, 158, 11, 0.3);
+  border-radius: 6px;
+  padding: 10px 12px;
+  margin-top: 12px;
+  width: 100%;
+}
+
+.webgpu-warning p {
   color: rgba(255, 255, 255, 0.9);
   font-size: 13px;
   margin: 0;

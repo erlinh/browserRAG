@@ -5,6 +5,7 @@ import './ModelSelector.css';
 const ModelSelector: React.FC = () => {
   const { selectedModel, setSelectedModel, progressInfo, useWebGPU, setUseWebGPU } = useModel();
   const [isWebGPUSupported, setIsWebGPUSupported] = useState<boolean | null>(null);
+  const [showUsabilityWarning, setShowUsabilityWarning] = useState<boolean>(false);
   
   // Check for WebGPU support when component mounts
   useEffect(() => {
@@ -38,6 +39,16 @@ const ModelSelector: React.FC = () => {
     checkWebGPUSupport();
   }, [useWebGPU, setUseWebGPU]);
   
+  // Show warning when WebGPU is toggled off
+  useEffect(() => {
+    // Only show warning when user explicitly disables WebGPU and it's supported
+    if (isWebGPUSupported && !useWebGPU) {
+      setShowUsabilityWarning(true);
+    } else {
+      setShowUsabilityWarning(false);
+    }
+  }, [useWebGPU, isWebGPUSupported]);
+  
   // Disable selection during loading
   const isDisabled = progressInfo.status === 'loading';
 
@@ -51,6 +62,19 @@ const ModelSelector: React.FC = () => {
 
   const handleWebGPUToggle = () => {
     setUseWebGPU(!useWebGPU);
+  };
+
+  // Get appropriate WebGPU status text
+  const getWebGPUStatusLabel = () => {
+    if (isWebGPUSupported === null) {
+      return 'Checking...';
+    } else if (isWebGPUSupported === false) {
+      return 'Not Supported';
+    } else if (useWebGPU) {
+      return 'Enabled';
+    } else {
+      return 'Disabled (Available)';
+    }
   };
 
   return (
@@ -95,11 +119,18 @@ const ModelSelector: React.FC = () => {
             />
             <span className="toggle-slider"></span>
           </label>
-          <span className="toggle-status">{useWebGPU ? 'Enabled' : 'Disabled'}</span>
+          <span className={`toggle-status ${isWebGPUSupported && !useWebGPU ? 'status-warning' : ''}`}>
+            {getWebGPUStatusLabel()}
+          </span>
         </div>
         {isWebGPUSupported === false && (
           <div className="webgpu-disclaimer">
-            <p>WebGPU is not supported in your browser. For hardware acceleration, please use a compatible browser.</p>
+            <p>WebGPU is not supported or enabled in your browser.</p>
+          </div>
+        )}
+        {showUsabilityWarning && (
+          <div className="webgpu-warning">
+            <p>⚠️ Warning: Disabling WebGPU may cause errors during model execution. If you encounter errors like "An error occurred during model execution", please re-enable WebGPU.</p>
           </div>
         )}
       </div>

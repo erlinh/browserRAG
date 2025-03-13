@@ -151,48 +151,68 @@ export const initializeLLM = async (
     // Determine which device to use
     const device = useWebGPU && 'gpu' in navigator ? 'webgpu' : 'wasm';
     
-    // Load model
-    const model = await AutoModelForCausalLM.from_pretrained(modelId, {
-      dtype: 'q4f16',
-      device: device,
-      progress_callback: (progress: any) => {
-        if (progressCallback && progress.progress) {
-          // Clamp progress value between 0 and 1
-          const clampedProgress = Math.max(0, Math.min(1, progress.progress));
+    try {
+      // Load model with the selected device
+      const model = await AutoModelForCausalLM.from_pretrained(modelId, {
+        dtype: 'q4f16',
+        device: device,
+        progress_callback: (progress: any) => {
+          if (progressCallback && progress.progress) {
+            // Clamp progress value between 0 and 1
+            const clampedProgress = Math.max(0, Math.min(1, progress.progress));
+            progressCallback({
+              status: 'loading',
+              message: `Loading LLM model (${Math.round(clampedProgress * 100)}%)`,
+              progress: 30 + clampedProgress * 50,
+              stage: 'model'
+            });
+          }
+        },
+      });
+      
+      if (progressCallback) {
+        progressCallback({ 
+          status: 'loading', 
+          message: 'Warming up model...', 
+          progress: 80,
+          stage: 'warmup'
+        });
+      }
+      
+      // Warm up the model with a small input
+      const warmUpInput = tokenizer('Hello, world!');
+      await model.generate({ ...warmUpInput, max_new_tokens: 1 });
+      
+      // Store in cache
+      modelCache[modelId] = { model, tokenizer };
+      currentModelId = modelId;
+      
+      if (progressCallback) {
+        progressCallback({ 
+          status: 'success', 
+          message: `LLM model loaded successfully (using ${device})`, 
+          progress: 100,
+          stage: 'complete'
+        });
+      }
+    } catch (modelError) {
+      // If WebGPU failed, show an appropriate error message
+      if (device === 'webgpu') {
+        console.warn('WebGPU initialization failed. Recommending user enable WebGPU for best performance.');
+        
+        if (progressCallback) {
           progressCallback({
-            status: 'loading',
-            message: `Loading LLM model (${Math.round(clampedProgress * 100)}%)`,
-            progress: 30 + clampedProgress * 50,
-            stage: 'model'
+            status: 'error',
+            message: `WebGPU model loading failed. Please enable WebGPU for best performance.`,
+            stage: 'error'
           });
         }
-      },
-    });
-    
-    if (progressCallback) {
-      progressCallback({ 
-        status: 'loading', 
-        message: 'Warming up model...', 
-        progress: 80,
-        stage: 'warmup'
-      });
-    }
-    
-    // Warm up the model with a small input
-    const warmUpInput = tokenizer('Hello, world!');
-    await model.generate({ ...warmUpInput, max_new_tokens: 1 });
-    
-    // Store in cache
-    modelCache[modelId] = { model, tokenizer };
-    currentModelId = modelId;
-    
-    if (progressCallback) {
-      progressCallback({ 
-        status: 'success', 
-        message: `LLM model loaded successfully (using ${device})`, 
-        progress: 100,
-        stage: 'complete'
-      });
+        
+        throw new Error(`WebGPU model initialization failed. Please enable WebGPU for better performance: ${modelError instanceof Error ? modelError.message : String(modelError)}`);
+      }
+      
+      // Re-throw the error for general handling
+      throw modelError;
     }
   } catch (error) {
     console.error('Failed to initialize LLM:', error);
