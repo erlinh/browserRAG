@@ -1,4 +1,5 @@
-import React, { createContext, useState, useContext, ReactNode } from 'react';
+import React, { createContext, useState, useContext, ReactNode, useEffect } from 'react';
+import { getUseWebGPU, setUseWebGPU } from '../services/llmService';
 
 // Define the available models
 export interface ModelOption {
@@ -18,11 +19,18 @@ export const MODEL_OPTIONS: ModelOption[] = [
     speed: 'Medium',
   },
   {
-    id: 'onnx-community/Phi-3.5-mini-instruct-onnx-web',
-    name: 'Phi-3.5-mini',
-    size: '3B',
-    quality: 'Great',
-    speed: 'Slow',
+    id: 'onnx-community/Pleias-Nano',
+    name: 'Pleias-Nano',
+    size: '0.5B',
+    quality: 'Okay',
+    speed: 'Fast',
+  },
+  {
+    id: 'onnx-community/Qwen2.5-0.5B-Instruct',
+    name: 'Qwen2.5-0.5B',
+    size: '0.5B',
+    quality: 'Bad',
+    speed: 'Fastest',
   }
 ];
 
@@ -40,6 +48,8 @@ interface ModelContextType {
   setSelectedModel: (model: ModelOption) => void;
   progressInfo: ProgressInfo;
   setProgressInfo: (info: ProgressInfo) => void;
+  useWebGPU: boolean;
+  setUseWebGPU: (enabled: boolean) => void;
 }
 
 // Create context with default values
@@ -48,6 +58,8 @@ const ModelContext = createContext<ModelContextType>({
   setSelectedModel: () => {},
   progressInfo: { status: 'idle', message: '', progress: 0 },
   setProgressInfo: () => {},
+  useWebGPU: true, // Default to true (using WebGPU)
+  setUseWebGPU: () => {},
 });
 
 // Create provider component
@@ -58,6 +70,19 @@ export const ModelProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     message: '',
     progress: 0,
   });
+  const [useWebGPUState, setUseWebGPUState] = useState<boolean>(true);
+
+  // Initialize the WebGPU state from the service
+  useEffect(() => {
+    // Get the initial value from service
+    setUseWebGPUState(getUseWebGPU());
+  }, []);
+  
+  // Update the service when state changes
+  const handleWebGPUChange = (enabled: boolean) => {
+    setUseWebGPUState(enabled);
+    setUseWebGPU(enabled);
+  };
 
   return (
     <ModelContext.Provider
@@ -66,6 +91,8 @@ export const ModelProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         setSelectedModel,
         progressInfo,
         setProgressInfo,
+        useWebGPU: useWebGPUState,
+        setUseWebGPU: handleWebGPUChange,
       }}
     >
       {children}

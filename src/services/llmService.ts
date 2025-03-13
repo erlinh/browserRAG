@@ -19,6 +19,7 @@ let currentModelId: string | null = null;
 let isBrowserCompatible = false;
 let llmIsLoading = false;
 const DEFAULT_MODEL_ID = 'onnx-community/DeepSeek-R1-Distill-Qwen-1.5B-ONNX';
+let useWebGPU = true; // Default to using WebGPU if available
 
 // Variables to track thinking content
 let isThinking = false;
@@ -31,15 +32,31 @@ const isChatModel = (modelId: string): boolean => {
 };
 
 /**
+ * Set whether to use WebGPU (if available)
+ */
+export const setUseWebGPU = (enable: boolean): void => {
+  useWebGPU = enable;
+  // Clear model cache when changing this setting as models need to be reloaded
+  clearAllModelsFromCache();
+};
+
+/**
+ * Get current WebGPU usage setting
+ */
+export const getUseWebGPU = (): boolean => {
+  return useWebGPU;
+};
+
+/**
  * Check if WebGPU or WebGL is supported
  */
 export const checkBrowserCompatibility = async (): Promise<boolean> => {
   try {
-    // Check for WebGPU support
-    if ('gpu' in navigator) {
+    // Check for WebGPU support if enabled
+    if (useWebGPU && 'gpu' in navigator) {
       const adapter = await (navigator as any).gpu.requestAdapter();
       if (adapter) {
-        console.log('WebGPU is supported');
+        console.log('WebGPU is supported and enabled');
         isBrowserCompatible = true;
         return true;
       }
@@ -49,7 +66,7 @@ export const checkBrowserCompatibility = async (): Promise<boolean> => {
     const canvas = document.createElement('canvas');
     const gl = canvas.getContext('webgl2');
     if (gl) {
-      console.log('WebGL2 is supported');
+      console.log('WebGL2 is supported' + (useWebGPU ? ' (WebGPU was preferred but not available)' : ''));
       isBrowserCompatible = true;
       return true;
     }
@@ -93,7 +110,7 @@ export const initializeLLM = async (
     if (!isBrowserCompatible) {
       const isCompatible = await checkBrowserCompatibility();
       if (!isCompatible) {
-        throw new Error('Browser does not support WebGPU or WebGL2');
+        throw new Error('Browser does not support required graphics capabilities (WebGPU or WebGL2)');
       }
     }
     
@@ -129,10 +146,13 @@ export const initializeLLM = async (
       });
     }
     
+    // Determine which device to use
+    const device = useWebGPU && 'gpu' in navigator ? 'webgpu' : 'wasm';
+    
     // Load model
     const model = await AutoModelForCausalLM.from_pretrained(modelId, {
       dtype: 'q4f16',
-      device: 'webgpu',
+      device: device,
       progress_callback: (progress: any) => {
         if (progressCallback && progress.progress) {
           progressCallback({
@@ -165,7 +185,7 @@ export const initializeLLM = async (
     if (progressCallback) {
       progressCallback({ 
         status: 'success', 
-        message: 'LLM model loaded successfully', 
+        message: `LLM model loaded successfully (using ${device})`, 
         progress: 100,
         stage: 'complete'
       });

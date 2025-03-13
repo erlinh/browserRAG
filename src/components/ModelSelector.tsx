@@ -3,7 +3,7 @@ import { useModel, ModelOption, MODEL_OPTIONS } from '../contexts/ModelContext';
 import './ModelSelector.css';
 
 const ModelSelector: React.FC = () => {
-  const { selectedModel, setSelectedModel, progressInfo } = useModel();
+  const { selectedModel, setSelectedModel, progressInfo, useWebGPU, setUseWebGPU } = useModel();
   
   // Disable selection during loading
   const isDisabled = progressInfo.status === 'loading';
@@ -14,6 +14,10 @@ const ModelSelector: React.FC = () => {
     if (newModel) {
       setSelectedModel(newModel);
     }
+  };
+
+  const handleWebGPUToggle = () => {
+    setUseWebGPU(!useWebGPU);
   };
 
   return (
@@ -46,6 +50,19 @@ const ModelSelector: React.FC = () => {
         <div className="model-info-item">
           <span className="info-label">Speed:</span>
           <span className="info-value">{selectedModel.speed}</span>
+        </div>
+        <div className="model-info-item webgpu-toggle">
+          <span className="info-label">Use WebGPU:</span>
+          <label className="toggle-switch">
+            <input
+              type="checkbox"
+              checked={useWebGPU}
+              onChange={handleWebGPUToggle}
+              disabled={isDisabled}
+            />
+            <span className="toggle-slider"></span>
+          </label>
+          <span className="toggle-status">{useWebGPU ? 'Enabled' : 'Disabled'}</span>
         </div>
       </div>
     </div>
