@@ -156,87 +156,137 @@ export const processPdfDocument = async (
  */
 export const processCsvDocument = async (
   file: File,
-  progressCallback?: (progress: number) => void
+  progressCallback?: (progress: number, chunkInfo?: { current: number, total: number }) => void
 ): Promise<void> => {
   const documentId = uuidv4();
   const fileName = file.name;
   
   return new Promise<void>((resolve, reject) => {
+    // Use incremental processing for large files
+    const chunkSize = 100; // Process chunks of 100 rows at a time
+    let currentChunk: DocumentChunk[] = [];
+    let processedRows = 0;
+    let totalRows = 0;
+    let headers: string[] = [];
+    let chunkCounter = 0;
+    let estimatedTotalChunks = 0;
+    
     Papa.parse(file, {
       header: true,
       skipEmptyLines: true,
-      complete: async (results) => {
+      // Remove the worker option as it's causing "Not implemented" error
+      step: async (results, parser) => {
         try {
-          if (progressCallback) {
-            progressCallback(20);
+          if (!results.data || typeof results.data !== 'object') {
+            return;
           }
           
-          const { data, meta } = results;
-          if (!data || !Array.isArray(data) || data.length === 0) {
-            throw new Error('No data found in CSV file');
+          // Get headers if this is the first row
+          if (headers.length === 0 && results.meta && results.meta.fields) {
+            headers = results.meta.fields;
           }
           
-          // Convert rows to chunks
-          const chunks: DocumentChunk[] = [];
+          totalRows++;
           
-          // Get headers
-          const headers = meta.fields || Object.keys(data[0] as object);
+          // Estimate total chunks based on file size and average row size
+          if (totalRows === 1) {
+            const avgRowSize = results.meta.cursor / totalRows;
+            estimatedTotalChunks = Math.ceil(file.size / (avgRowSize * chunkSize));
+          }
           
-          // Process each row
-          data.forEach((row: any, rowIndex) => {
-            // Create a text representation of the row
-            let rowText = '';
-            
-            // Add headers and values
-            for (const header of headers) {
-              if (row[header]) {
-                rowText += `${header}: ${row[header]}\n`;
+          const row = results.data as Record<string, any>;
+          
+          // Create a text representation of the row
+          let rowText = '';
+          
+          // Add headers and values
+          for (const header of headers) {
+            if (row[header]) {
+              rowText += `${header}: ${row[header]}\n`;
+            }
+          }
+          
+          if (rowText.trim()) {
+            currentChunk.push({
+              id: `${documentId}-row-${processedRows}`,
+              text: rowText.trim(),
+              metadata: {
+                documentId,
+                documentName: fileName,
+                rowIndex: processedRows,
+                chunkIndex: processedRows,
               }
-            }
-            
-            if (rowText.trim()) {
-              chunks.push({
-                id: `${documentId}-row-${rowIndex}`,
-                text: rowText.trim(),
-                metadata: {
-                  documentId,
-                  documentName: fileName,
-                  rowIndex,
-                  chunkIndex: chunks.length,
-                }
-              });
-            }
-          });
-          
-          if (progressCallback) {
-            progressCallback(40);
+            });
           }
           
-          // Generate embeddings for all chunks
-          const texts = chunks.map(chunk => chunk.text);
-          const embeddings = await generateEmbeddings(texts, (progress) => {
-            if (progressCallback) {
-              // Map progress from 0-100 to 40-80
-              progressCallback(40 + Math.round(progress * 0.4));
-            }
-          });
+          processedRows++;
           
-          // Store embeddings in vector store
-          await storeEmbeddings(
-            documentId,
-            chunks.map(chunk => chunk.id),
-            embeddings,
-            texts,
-            chunks.map(chunk => chunk.metadata)
-          );
+          // If we have enough chunks, process them
+          if (currentChunk.length >= chunkSize) {
+            // Pause parsing while we process this chunk
+            parser.pause();
+            
+            // Increment chunk counter
+            chunkCounter++;
+            
+            if (progressCallback) {
+              // Calculate progress based on rows processed
+              const rowProgress = Math.min(30, Math.round((processedRows / (totalRows || processedRows)) * 30));
+              progressCallback(
+                rowProgress, 
+                { current: chunkCounter, total: estimatedTotalChunks }
+              );
+            }
+            
+            // Process in the background and resume parsing after
+            setTimeout(async () => {
+              try {
+                await processChunk(
+                  currentChunk, 
+                  documentId, 
+                  (progress: number) => processCallback(progress, chunkCounter, estimatedTotalChunks)
+                );
+                currentChunk = [];
+                parser.resume();
+              } catch (error) {
+                console.error(`Error processing CSV chunk:`, error);
+                parser.abort();
+                reject(error);
+              }
+            }, 0);
+          }
+        } catch (error) {
+          console.error(`Error processing CSV row:`, error);
+          parser.abort();
+          reject(error);
+        }
+      },
+      complete: async () => {
+        try {
+          // Process any remaining rows
+          if (currentChunk.length > 0) {
+            // Increment chunk counter for the final chunk
+            chunkCounter++;
+            
+            if (progressCallback) {
+              progressCallback(30, { current: chunkCounter, total: estimatedTotalChunks });
+            }
+            
+            await processChunk(
+              currentChunk, 
+              documentId, 
+              (progress: number) => processCallback(progress, chunkCounter, estimatedTotalChunks)
+            );
+          }
           
           if (progressCallback) {
-            progressCallback(100);
+            // Final progress update
+            progressCallback(100, { current: chunkCounter, total: chunkCounter });
           }
           
           resolve();
         } catch (error) {
-          console.error(`Error processing CSV document ${fileName}:`, error);
+          console.error(`Error finalizing CSV document ${fileName}:`, error);
           reject(error);
         }
       },
@@ -245,5 +295,47 @@ export const processCsvDocument = async (
         reject(error);
       }
     });
+    
+    // Helper function to process chunks with progress callback
+    const processCallback = (
+      progress: number, 
+      currentChunkNum: number, 
+      totalChunks: number
+    ) => {
+      if (progressCallback) {
+        // Map progress from 0-100 to 30-95 for embedding generation
+        progressCallback(
+          30 + Math.round(progress * 0.65), 
+          { current: currentChunkNum, total: totalChunks }
+        );
+      }
+    };
+    
+    // Helper function to process a chunk of documents
+    async function processChunk(
+      chunk: DocumentChunk[], 
+      docId: string, 
+      progressCb?: (progress: number) => void
+    ): Promise<void> {
+      // Generate embeddings for all chunks
+      const texts = chunk.map(chunk => chunk.text);
+      
+      // Use setTimeout to yield to the browser's event loop
+      await new Promise(resolve => setTimeout(resolve, 0));
+      
+      const embeddings = await generateEmbeddings(texts, progressCb);
+      
+      // Use setTimeout again to yield to the browser's event loop
+      await new Promise(resolve => setTimeout(resolve, 0));
+      
+      // Store embeddings in vector store
+      await storeEmbeddings(
+        docId,
+        chunk.map(c => c.id),
+        embeddings,
+        texts,
+        chunk.map(c => c.metadata)
+      );
+    }
   });
 }; 

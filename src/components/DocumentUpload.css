@@ -67,9 +67,30 @@
   transition: width 0.3s ease;
 }
 
-.progress-text {
+.progress-details {
   margin-top: 0.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.progress-text {
+  margin: 0;
   font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.progress-status {
+  margin: 0;
+  font-size: 0.875rem;
+  color: #3b82f6;
+}
+
+.progress-chunks {
+  margin: 0;
+  font-size: 0.75rem;
+  color: #9ca3af;
+  font-style: italic;
 }
 
 .error-message {

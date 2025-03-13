@@ -16,6 +16,9 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
   const [isProcessing, setIsProcessing] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [processingStatus, setProcessingStatus] = useState<string>('');
+  const [currentChunk, setCurrentChunk] = useState<number>(0);
+  const [totalChunks, setTotalChunks] = useState<number>(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleFileChange = async (e: ChangeEvent<HTMLInputElement>) => {
@@ -25,6 +28,9 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
     setErrorMessage(null);
     setIsProcessing(true);
     setUploadProgress(0);
+    setProcessingStatus('');
+    setCurrentChunk(0);
+    setTotalChunks(0);
     
     try {
       for (let i = 0; i < files.length; i++) {
@@ -36,13 +42,35 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
         setUploadProgress(Math.round((i / files.length) * 50));
         
         if (fileType === 'pdf') {
+          setProcessingStatus('Processing PDF document...');
           await processPdfDocument(file, (progress: number) => {
             // Map processing progress from 0-100 to 50-100 for the total progress
             setUploadProgress(50 + Math.round(progress * 0.5));
           });
           onDocumentProcessed(fileName);
         } else if (fileType === 'csv') {
-          await processCsvDocument(file, (progress: number) => {
+          setProcessingStatus('Processing CSV document...');
+          
+          // Track processed chunks for CSV files
+          let processedChunks = 0;
+          const estimatedChunks = Math.ceil(file.size / 50000); // Rough estimate based on file size
+          setTotalChunks(estimatedChunks > 0 ? estimatedChunks : 1);
+          
+          await processCsvDocument(file, (progress: number, chunkInfo?: { current: number, total: number }) => {
+            // If we have chunk info, update the status message
+            if (chunkInfo) {
+              setCurrentChunk(chunkInfo.current);
+              if (chunkInfo.total > 0) {
+                setTotalChunks(chunkInfo.total);
+              }
+              // Only increment processed chunks when a new chunk starts processing
+              if (chunkInfo.current > processedChunks) {
+                processedChunks = chunkInfo.current;
+              }
+              setProcessingStatus(`Processing CSV (Chunk ${chunkInfo.current} of ${chunkInfo.total === 0 ? 'unknown' : chunkInfo.total})...`);
+            }
+            
+            // Calculate overall progress, balancing between parsing (50%) and embedding (50%)
             setUploadProgress(50 + Math.round(progress * 0.5));
           });
           onDocumentProcessed(fileName);
@@ -52,13 +80,23 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
       }
       
       setUploadProgress(100);
+      setProcessingStatus('Complete!');
       // Reset file input
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
       }
+      
+      // Reset status message after a brief delay
+      setTimeout(() => {
+        if (!isProcessing) {
+          setProcessingStatus('');
+        }
+      }, 1500);
+      
     } catch (error) {
       console.error('Error processing document:', error);
       setErrorMessage(error instanceof Error ? error.message : 'Failed to process document');
+      setProcessingStatus('Error processing document');
     } finally {
       setIsProcessing(false);
     }
@@ -98,7 +136,17 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
                 style={{ width: `${uploadProgress}%` }}
               ></div>
             </div>
-            <p className="progress-text">{uploadProgress}% complete</p>
+            <div className="progress-details">
+              <p className="progress-text">{uploadProgress}% complete</p>
+              {processingStatus && (
+                <p className="progress-status">{processingStatus}</p>
+              )}
+              {currentChunk > 0 && totalChunks > 0 && (
+                <p className="progress-chunks">
+                  Processing in chunks to prevent browser freezing ({currentChunk} of {totalChunks})
+                </p>
+              )}
+            </div>
           </div>
         )}
         
