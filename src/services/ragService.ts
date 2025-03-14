@@ -14,7 +14,8 @@ export const queryDocuments = async (
   documentNames: string[],
   model: ModelInfo,
   progressCallback?: ProgressCallback,
-  projectId?: string
+  projectId?: string,
+  streamCallback?: (token: string) => void
 ): Promise<string> => {
   try {
     // Check if we have documents
@@ -48,39 +49,23 @@ export const queryDocuments = async (
     let alternateResponse = '';
     if (similarChunks.length === 0) {
       // Get a count of all embeddings for this project to determine if any exist
-      const totalDocCount = await getDocumentCount(projectId);
+      const count = await getDocumentCount(projectId);
       
-      if (totalDocCount === 0) {
-        alternateResponse = `I couldn't find any indexed content for your documents. This might indicate that your documents weren't properly processed. Try re-uploading them or checking if they contain extractable text.`;
+      if (count > 0) {
+        // Some documents exist but no good matches were found
+        alternateResponse = `I couldn't find any relevant information in the documents to answer your question.`;
       } else {
-        // Try increasing the number of results to see if we get any matches at all
-        const moreSimilarChunks = await queryEmbeddings(queryEmbedding, 10, projectId);
-        
-        if (moreSimilarChunks.length > 0) {
-          // We got some results with a larger limit, but they might not be very relevant
-          console.log(`Found ${moreSimilarChunks.length} chunks with expanded search`);
-          similarChunks.push(...moreSimilarChunks);
-          alternateResponse = `I found some information in your documents, but it might not be directly relevant to your question.`;
-        } else {
-          // Still no results, provide a helpful message
-          alternateResponse = `I couldn't find any relevant information in your documents to answer that question. Your documents contain ${totalDocCount} indexed chunks, but none seem to match your query about "${question}". Try rephrasing your question or asking about different topics covered in your documents.`;
-        }
+        // No documents have been properly indexed
+        return `No document embeddings were found for this project. Please make sure your documents have been processed correctly.`;
       }
-    }
-    
-    if (similarChunks.length === 0) {
-      if (progressCallback) {
-        progressCallback('complete', 100);
-      }
-      return alternateResponse;
     }
     
     // Update progress
     if (progressCallback) {
-      progressCallback('generation', 40);
+      progressCallback('processing', 40);
     }
     
-    // 3. Construct prompt with retrieved context
+    // 3. Construct a prompt with the retrieved chunks
     const prompt = constructRAGPrompt(question, similarChunks, alternateResponse);
     
     // Update progress
@@ -88,8 +73,19 @@ export const queryDocuments = async (
       progressCallback('generation', 60);
     }
     
-    // 4. Generate response using LLM
-    const response = await generateResponse(prompt, model.id);
+    // 4. Generate response with the LLM
+    const response = await generateResponse(
+      prompt, 
+      model.id,
+      (progress) => {
+        if (progressCallback) {
+          // Map the LLM progress to our progress range (60-100%)
+          const mappedProgress = 60 + (progress.progress || 0) * 0.4;
+          progressCallback(progress.stage || 'generation', mappedProgress);
+        }
+      },
+      streamCallback  // Pass the stream callback to generateResponse
+    );
     
     // Update progress
     if (progressCallback) {
@@ -98,7 +94,7 @@ export const queryDocuments = async (
     
     return response;
   } catch (error) {
-    console.error('Error in RAG pipeline:', error);
+    console.error('Error in queryDocuments:', error);
     throw error;
   }
 };

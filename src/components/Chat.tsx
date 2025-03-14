@@ -15,6 +15,9 @@ interface Message {
   isThinking?: boolean;
   thinkingFor?: string; // ID of the question this thinking relates to
   isStreaming?: boolean; // For streaming partial responses
+  thoughtContent?: string; // Content of the model's thoughts
+  areThoughtsCollapsed?: boolean; // Whether thoughts are collapsed
+  associatedQuestionId?: string; // ID of the associated user question
 }
 
 interface ChatProps {
@@ -34,6 +37,64 @@ const Chat: React.FC<ChatProps> = ({ documents, projectId, chatId, chatSession }
   
   // Get model context
   const { selectedModel, progressInfo, setProgressInfo } = useModel();
+
+  // Add event listener for thinking events
+  useEffect(() => {
+    const handleThinking = (event: CustomEvent<{ text: string }>) => {
+      setMessages(prev => {
+        const newMessages = [...prev];
+        // Find the last assistant message that is associated with the current question
+        const lastAssistantIndex = newMessages.findIndex(
+          m => m.role === 'assistant' && 
+               !m.isThinking && 
+               m.associatedQuestionId === currentQuestionRef.current
+        );
+        
+        if (lastAssistantIndex !== -1) {
+          // Update the thought content for this message
+          newMessages[lastAssistantIndex] = {
+            ...newMessages[lastAssistantIndex],
+            thoughtContent: event.detail.text,
+            areThoughtsCollapsed: false
+          };
+        }
+        return newMessages;
+      });
+    };
+
+    // Add event listener for streamed text
+    const handleStreamedText = (event: CustomEvent<{ text: string }>) => {
+      setMessages(prev => {
+        const newMessages = [...prev];
+        // Find the last assistant message that is associated with the current question
+        const lastAssistantIndex = newMessages.findIndex(
+          m => m.role === 'assistant' && 
+               !m.isThinking && 
+               m.associatedQuestionId === currentQuestionRef.current
+        );
+        
+        if (lastAssistantIndex !== -1) {
+          // Update the content with the streamed text
+          newMessages[lastAssistantIndex] = {
+            ...newMessages[lastAssistantIndex],
+            content: event.detail.text,
+            isStreaming: true
+          };
+        }
+        return newMessages;
+      });
+    };
+
+    // Add event listeners
+    window.addEventListener('thinking', handleThinking as EventListener);
+    window.addEventListener('streamedText', handleStreamedText as EventListener);
+    
+    // Clean up
+    return () => {
+      window.removeEventListener('thinking', handleThinking as EventListener);
+      window.removeEventListener('streamedText', handleStreamedText as EventListener);
+    };
+  }, []);
 
   // Load messages from chat session
   useEffect(() => {
@@ -90,11 +151,25 @@ const Chat: React.FC<ChatProps> = ({ documents, projectId, chatId, chatSession }
 
     const question = input.trim();
     setInput('');
-    currentQuestionRef.current = question;
     setError(null);
+
+    // Collapse all thoughts when a new message is sent
+    setMessages(prev => {
+      return prev.map(message => {
+        if (message.thoughtContent && !message.areThoughtsCollapsed) {
+          return {
+            ...message,
+            areThoughtsCollapsed: true
+          };
+        }
+        return message;
+      });
+    });
 
     // Add user message
     const userMessageId = Date.now().toString();
+    currentQuestionRef.current = userMessageId; // Store the message ID instead of the question text
+    
     const userMessage: Message = {
       id: userMessageId,
       role: 'user',
@@ -145,35 +220,79 @@ const Chat: React.FC<ChatProps> = ({ documents, projectId, chatId, chatSession }
         isDownloaded: true
       };
 
-      // Query documents
-      const response = await queryDocuments(
-        question,
-        documents,
-        modelInfo,
-        progressCallback,
-        projectId
-      );
-
-      // Remove thinking message and add assistant response
+      // Remove thinking message and add initial assistant response container
       setMessages(prev => {
         const filtered = prev.filter(m => m.id !== thinkingMessageId);
         const assistantMessage: Message = {
           id: Date.now().toString(),
           role: 'assistant',
-          content: response,
+          content: '',  // Start with empty content that will be streamed
           timestamp: new Date(),
+          areThoughtsCollapsed: false,
+          isStreaming: true,
+          associatedQuestionId: userMessageId  // Associate with the question
         };
-        
-        // Save assistant message to chat session
-        addMessageToChatSession(
-          projectId,
-          chatId,
-          'assistant',
-          response
-        );
         
         return [...filtered, assistantMessage];
       });
+      
+      // Set up a stream callback for response text
+      const streamCallback = (text: string) => {
+        const event = new CustomEvent('streamedText', { 
+          detail: { text }
+        });
+        window.dispatchEvent(event);
+      };
+
+      // Query documents with streaming
+      const response = await queryDocuments(
+        question,
+        documents,
+        modelInfo,
+        progressCallback,
+        projectId,
+        streamCallback  // Add streaming callback
+      );
+
+      // Update the message to indicate streaming is complete
+      setMessages(prev => {
+        return prev.map(message => {
+          if (message.role === 'assistant' && message.associatedQuestionId === userMessageId) {
+            return {
+              ...message,
+              content: response,  // Final full response
+              isStreaming: false
+            };
+          }
+          return message;
+        });
+      });
+
+      // Save assistant message to chat session
+      addMessageToChatSession(
+        projectId,
+        chatId,
+        'assistant',
+        response
+      );
+
+      // Auto-collapse thoughts after a delay
+      setTimeout(() => {
+        setMessages(prev => {
+          return prev.map(message => {
+            if (message.role === 'assistant' && 
+                message.thoughtContent && 
+                !message.areThoughtsCollapsed && 
+                message.associatedQuestionId === userMessageId) {
+              return {
+                ...message,
+                areThoughtsCollapsed: true
+              };
+            }
+            return message;
+          });
+        });
+      }, 5000); // Collapse after 5 seconds
     } catch (err) {
       console.error('Error querying documents:', err);
       
@@ -209,6 +328,21 @@ const Chat: React.FC<ChatProps> = ({ documents, projectId, chatId, chatSession }
     }
   };
 
+  // Toggle thoughts collapse state
+  const toggleThoughts = (messageId: string) => {
+    setMessages(prev => {
+      return prev.map(message => {
+        if (message.id === messageId && message.thoughtContent) {
+          return {
+            ...message,
+            areThoughtsCollapsed: !message.areThoughtsCollapsed
+          };
+        }
+        return message;
+      });
+    });
+  };
+
   return (
     <div className="chat">
       <div className="chat-header">
@@ -233,7 +367,32 @@ const Chat: React.FC<ChatProps> = ({ documents, projectId, chatId, chatSession }
                     <div className="dot"></div>
                   </div>
                 ) : (
-                  message.content
+                  <>
+                    {message.content}
+                    
+                    {message.thoughtContent && (
+                      <div className={`thoughts-container ${
+                        isProcessing && 
+                        !message.areThoughtsCollapsed && 
+                        message.id === messages.filter(m => m.role === 'assistant' && !m.isThinking).pop()?.id 
+                          ? 'thinking' 
+                          : ''
+                      }`}>
+                        <div 
+                          className="thoughts-toggle" 
+                          onClick={() => toggleThoughts(message.id)}
+                        >
+                          {message.areThoughtsCollapsed ? 'Show thoughts' : 'Hide thoughts'}
+                        </div>
+                        
+                        {!message.areThoughtsCollapsed && (
+                          <div className="thoughts-content">
+                            <pre>{message.thoughtContent}</pre>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
               <div className="message-timestamp">

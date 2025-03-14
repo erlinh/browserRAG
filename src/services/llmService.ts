@@ -269,6 +269,14 @@ const emitThinkingEvent = (text: string) => {
   window.dispatchEvent(event);
 };
 
+// Custom event to emit streamed text content
+const emitStreamedTextEvent = (text: string) => {
+  const event = new CustomEvent('streamedText', { 
+    detail: { text }
+  });
+  window.dispatchEvent(event);
+};
+
 /**
  * Generate response from the LLM model
  */
@@ -343,8 +351,11 @@ export const generateResponse = async (
       // For regular output, add to normal buffer and call the stream callback
       normalOutputBuffer += token;
       
+      // Emit the updated text content
+      emitStreamedTextEvent(normalOutputBuffer);
+      
       if (streamCallback) {
-        streamCallback(token);
+        streamCallback(normalOutputBuffer);
       }
     };
     

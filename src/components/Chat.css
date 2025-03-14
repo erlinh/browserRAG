@@ -76,11 +76,96 @@
   font-size: 0.9375rem;
 }
 
+/* Thoughts styling */
+.thoughts-container {
+  margin-top: 0.75rem;
+  border-top: 1px dashed rgba(255, 255, 255, 0.2);
+  padding-top: 0.5rem;
+  position: relative;
+}
+
+.thoughts-container.thinking::after {
+  content: '';
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  width: 0.5rem;
+  height: 0.5rem;
+  background-color: #10b981;
+  border-radius: 50%;
+  animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+  0% { opacity: 0.4; transform: scale(0.8); }
+  50% { opacity: 1; transform: scale(1.2); }
+  100% { opacity: 0.4; transform: scale(0.8); }
+}
+
+.thoughts-toggle {
+  font-size: 0.75rem;
+  color: rgba(255, 255, 255, 0.6);
+  cursor: pointer;
+  display: inline-block;
+  padding: 0.25rem 0.5rem;
+  border-radius: 0.25rem;
+  background-color: rgba(255, 255, 255, 0.1);
+  margin-bottom: 0.5rem;
+  transition: all 0.2s ease;
+}
+
+.thoughts-toggle:hover {
+  background-color: rgba(255, 255, 255, 0.15);
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.thoughts-content {
+  background-color: rgba(0, 0, 0, 0.2);
+  border-radius: 0.25rem;
+  padding: 0.5rem;
+  margin-top: 0.25rem;
+  max-height: 200px;
+  overflow-y: auto;
+  font-size: 0.8125rem;
+  animation: fadeIn 0.3s ease-in;
+}
+
+.thoughts-content pre {
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: monospace;
+  color: rgba(255, 255, 255, 0.7);
+  line-height: 1.4;
+}
+
 .message-timestamp {
   font-size: 0.75rem;
   margin-top: 0.375rem;
   color: rgba(255, 255, 255, 0.5);
   text-align: right;
+}
+
+.message.streaming {
+  animation: streaming-pulse 2s infinite;
+}
+
+@keyframes streaming-pulse {
+  0% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.2); }
+  70% { box-shadow: 0 0 0 8px rgba(59, 130, 246, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0); }
+}
+
+.message.streaming::after {
+  content: '';
+  position: absolute;
+  top: 0.75rem;
+  right: 0.75rem;
+  width: 0.5rem;
+  height: 0.5rem;
+  background-color: #3b82f6;
+  border-radius: 50%;
+  animation: pulse 1.5s infinite;
 }
 
 .message.thinking {
