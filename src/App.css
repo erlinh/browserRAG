@@ -171,6 +171,10 @@ body {
 .chat-sidebar {
   width: var(--chat-sidebar-width);
   position: relative;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  max-height: calc(100vh - 200px);
   transition: width var(--transition-speed) ease;
 }
 

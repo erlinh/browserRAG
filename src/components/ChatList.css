@@ -5,13 +5,17 @@
   padding-left: 40px; /* Space for the toggle button */
   margin-bottom: 0;
   width: 100%;
-  height: 100%;
-  overflow-y: auto;
+  height: auto; /* Change from 100% to auto */
+  max-height: calc(100vh - 180px); /* Limit height to viewport height minus space for header/footer/tabs */
+  display: flex;
+  flex-direction: column;
+  overflow: hidden; /* Change from auto to hidden so child can scroll */
   transition: opacity var(--transition-speed) ease;
   opacity: 1;
 }
 
 .chat-list-header {
+  flex-shrink: 0; /* Prevent header from shrinking */
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -39,6 +43,7 @@
 }
 
 .create-chat-form {
+  flex-shrink: 0; /* Prevent form from shrinking */
   background-color: rgba(255, 255, 255, 0.05);
   border-radius: 0.5rem;
   padding: 1rem;
@@ -96,8 +101,10 @@
 }
 
 .chats-container {
-  max-height: 100%;
-  overflow-y: auto;
+  flex: 1;
+  overflow-y: auto; /* Enable vertical scrolling */
+  min-height: 0; /* Important for flex child to enable scrolling */
+  margin-bottom: 0.5rem;
 }
 
 .chats-container ul {

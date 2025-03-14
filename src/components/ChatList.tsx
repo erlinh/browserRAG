@@ -104,7 +104,7 @@ const ChatList: React.FC<ChatListProps> = ({
           <ul>
             {chats.map((chat, index) => (
               <li 
-                key={`chat-${chat.id}-${index}`} 
+                key={`chat-${chat.id}`} 
                 className={`chat-item ${selectedChatId === chat.id ? 'selected' : ''}`}
               >
                 {editingChatId === chat.id ? (

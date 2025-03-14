@@ -136,6 +136,18 @@ function App() {
     }
   }, [selectedProject]);
 
+  // Create a default chat if none exists when switching to chat tab
+  useEffect(() => {
+    if (activeTab === 'chat' && selectedProject && chatSessions.length === 0) {
+      // Create default chat
+      const defaultChat = createChatSession(selectedProject.id, 'Default Chat');
+      if (defaultChat) {
+        setChatSessions([defaultChat]);
+        setSelectedChatId(defaultChat.id);
+      }
+    }
+  }, [activeTab, selectedProject, chatSessions.length]);
+
   // Update selected chat session when chat ID changes
   useEffect(() => {
     if (selectedProject && selectedChatId) {
@@ -221,7 +233,9 @@ function App() {
       
       const newChat = createChatSession(defaultProject.id, chatName);
       if (newChat) {
-        setChatSessions([...chatSessions, newChat]);
+        // Get fresh chat sessions instead of appending to prevent duplicates
+        const updatedSessions = getProjectChatSessions(defaultProject.id);
+        setChatSessions(updatedSessions);
         setSelectedChatId(newChat.id);
       }
     } else {
@@ -235,7 +249,9 @@ function App() {
       
       const newChat = createChatSession(selectedProject.id, chatName);
       if (newChat) {
-        setChatSessions([...chatSessions, newChat]);
+        // Get fresh chat sessions instead of appending to prevent duplicates
+        const updatedSessions = getProjectChatSessions(selectedProject.id);
+        setChatSessions(updatedSessions);
         setSelectedChatId(newChat.id);
       }
     }
