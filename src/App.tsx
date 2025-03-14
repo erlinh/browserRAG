@@ -44,6 +44,31 @@ function App() {
   const [selectedChatId, setSelectedChatId] = useState<string | null>(null);
   const [selectedChatSession, setSelectedChatSession] = useState<ChatSession | null>(null);
 
+  // Sidebar collapse state
+  const [projectSidebarCollapsed, setProjectSidebarCollapsed] = useState(false);
+  const [chatSidebarCollapsed, setChatSidebarCollapsed] = useState(false);
+
+  // Track window width for responsive design
+  const [windowWidth, setWindowWidth] = useState(window.innerWidth);
+
+  // Effect to handle window resizing
+  useEffect(() => {
+    const handleResize = () => {
+      setWindowWidth(window.innerWidth);
+      
+      // Auto-collapse project sidebar on mobile
+      if (window.innerWidth <= 768) {
+        setProjectSidebarCollapsed(true);
+      }
+    };
+
+    // Set initial state based on window size
+    handleResize();
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
   useEffect(() => {
     const setupDatabase = async () => {
       try {
@@ -66,11 +91,19 @@ function App() {
   useEffect(() => {
     if (isDbReady) {
       const availableProjects = getProjects();
-      setProjects(availableProjects);
       
-      // Select first project by default if available
-      if (availableProjects.length > 0 && !selectedProject) {
-        setSelectedProject(availableProjects[0]);
+      // Create a default project if no projects exist
+      if (availableProjects.length === 0) {
+        const defaultProject = createProject('Default Project', 'Automatically created default project');
+        setProjects([defaultProject]);
+        setSelectedProject(defaultProject);
+      } else {
+        setProjects(availableProjects);
+        
+        // Select first project by default if available
+        if (availableProjects.length > 0 && !selectedProject) {
+          setSelectedProject(availableProjects[0]);
+        }
       }
     }
   }, [isDbReady, selectedProject]);
@@ -172,12 +205,39 @@ function App() {
   };
 
   const handleCreateChat = (name: string) => {
-    if (!selectedProject) return;
-    
-    const newChat = createChatSession(selectedProject.id, name);
-    if (newChat) {
-      setChatSessions([...chatSessions, newChat]);
-      setSelectedChatId(newChat.id);
+    if (!selectedProject) {
+      // Create a default project if none is selected
+      const defaultProject = createProject('Default Project', 'Automatically created default project');
+      setProjects([...projects, defaultProject]);
+      setSelectedProject(defaultProject);
+      
+      // Generate a placeholder name based on date/time if not provided
+      const chatName = name || `Chat ${new Date().toLocaleString('en-US', { 
+        month: 'short', 
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      })}`;
+      
+      const newChat = createChatSession(defaultProject.id, chatName);
+      if (newChat) {
+        setChatSessions([...chatSessions, newChat]);
+        setSelectedChatId(newChat.id);
+      }
+    } else {
+      // Generate a placeholder name based on date/time if not provided
+      const chatName = name || `Chat ${new Date().toLocaleString('en-US', { 
+        month: 'short', 
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      })}`;
+      
+      const newChat = createChatSession(selectedProject.id, chatName);
+      if (newChat) {
+        setChatSessions([...chatSessions, newChat]);
+        setSelectedChatId(newChat.id);
+      }
     }
   };
 
@@ -208,6 +268,21 @@ function App() {
     }
   };
 
+  // Toggle project sidebar
+  const toggleProjectSidebar = () => {
+    setProjectSidebarCollapsed(!projectSidebarCollapsed);
+  };
+
+  // Toggle chat sidebar
+  const toggleChatSidebar = () => {
+    setChatSidebarCollapsed(!chatSidebarCollapsed);
+  };
+
+  // Handle overlay click (mobile)
+  const handleOverlayClick = () => {
+    setProjectSidebarCollapsed(true);
+  };
+
   // Convert DocumentInfo[] to string[] for Chat component
   const documentNames = documents.map(doc => doc.name);
 
@@ -218,8 +293,20 @@ function App() {
         <p>Chat with your documents entirely in your browser</p>
       </header>
 
+      {/* Mobile overlay for sidebar */}
+      {!projectSidebarCollapsed && windowWidth <= 768 && (
+        <div className="sidebar-overlay active" onClick={handleOverlayClick}></div>
+      )}
+
       <div className="app-main">
-        <aside className="app-sidebar">
+        <aside className={`app-sidebar ${projectSidebarCollapsed ? 'collapsed' : ''}`}>
+          <button 
+            className="sidebar-toggle" 
+            onClick={toggleProjectSidebar}
+            aria-label={projectSidebarCollapsed ? "Show projects" : "Hide projects"}
+          >
+            {projectSidebarCollapsed ? "+" : "−"}
+          </button>
           <ProjectSelector 
             projects={projects} 
             selectedProjectId={selectedProject?.id || ''} 
@@ -261,7 +348,14 @@ function App() {
               />
             ) : (
               <div className="chat-interface">
-                <div className="chat-sidebar">
+                <div className={`chat-sidebar ${chatSidebarCollapsed ? 'collapsed' : ''}`}>
+                  <button 
+                    className="chat-sidebar-toggle" 
+                    onClick={toggleChatSidebar}
+                    aria-label={chatSidebarCollapsed ? "Show chats" : "Hide chats"}
+                  >
+                    {chatSidebarCollapsed ? "+" : "−"}
+                  </button>
                   <ChatList 
                     chats={chatSessions}
                     selectedChatId={selectedChatId}

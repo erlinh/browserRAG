@@ -1,9 +1,12 @@
 .project-selector {
   background-color: transparent;
   padding: 1rem;
+  padding-left: 40px; /* Space for toggle button */
   height: 100%;
   display: flex;
   flex-direction: column;
+  overflow-y: auto;
+  width: 100%;
 }
 
 .project-selector-header {
@@ -99,9 +102,11 @@
   cursor: not-allowed;
 }
 
+/* Scrollable projects list */
 .projects-list {
   flex: 1;
   overflow-y: auto;
+  margin-bottom: 1rem;
 }
 
 .projects-list ul {
@@ -233,4 +238,28 @@
   padding: 2rem 0;
   color: #9ca3af;
   font-style: italic;
+}
+
+/* Collapsed sidebar styles */
+.app-sidebar.collapsed .project-selector {
+  opacity: 0;
+  pointer-events: none;
+}
+
+@media (max-width: 768px) {
+  .project-selector {
+    padding: 1rem;
+    padding-left: 40px;
+    padding-top: 4rem; /* Extra space at top for fixed toggle button */
+    height: 100%;
+    width: 100%;
+  }
+  
+  .project-selector-header h2 {
+    font-size: 1.2rem;
+  }
+  
+  .create-project-button {
+    padding: 0.5rem 0.75rem;
+  }
 } 

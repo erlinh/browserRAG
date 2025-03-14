@@ -256,7 +256,7 @@ export const deleteDocumentFromProject = (projectId: string, documentId: string)
 /**
  * Create a new chat session for a project
  */
-export const createChatSession = (projectId: string, name: string = 'New Chat'): ChatSession | null => {
+export const createChatSession = (projectId: string, name: string = ''): ChatSession | null => {
   const project = getProjectById(projectId);
   if (!project) return null;
 
@@ -264,10 +264,18 @@ export const createChatSession = (projectId: string, name: string = 'New Chat'):
     chatSessions[projectId] = [];
   }
 
+  // Generate a default chat name if none provided
+  const chatName = name || `Chat ${new Date().toLocaleString('en-US', { 
+    month: 'short', 
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
+  })}`;
+
   const newChat: ChatSession = {
     id: uuidv4(),
     projectId,
-    name,
+    name: chatName,
     messages: [],
     createdAt: new Date(),
     updatedAt: new Date()

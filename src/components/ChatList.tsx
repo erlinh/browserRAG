@@ -31,7 +31,7 @@ const ChatList: React.FC<ChatListProps> = ({
       setNewChatName('');
       setIsCreatingChat(false);
     } else {
-      onCreateChat('New Chat');
+      onCreateChat('');
       setIsCreatingChat(false);
     }
   };

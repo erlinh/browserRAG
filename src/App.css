@@ -4,7 +4,9 @@
   --app-text-color: #f3f4f6;
   --app-border-color: rgba(255, 255, 255, 0.1);
   --app-accent-color: #3b82f6;
-  --sidebar-width: 300px;
+  --sidebar-width: 280px;
+  --chat-sidebar-width: 280px;
+  --transition-speed: 0.3s;
 }
 
 body {
@@ -39,23 +41,58 @@ body {
   color: rgba(255, 255, 255, 0.7);
 }
 
+/* Main layout */
 .app-main {
   display: flex;
   flex: 1;
 }
 
+/* Project sidebar */
 .app-sidebar {
   width: var(--sidebar-width);
-  flex-shrink: 0;
-  border-right: 1px solid var(--app-border-color);
   background-color: var(--app-header-bg);
-  overflow-y: auto;
-  position: sticky;
-  top: 0;
+  border-right: 1px solid var(--app-border-color);
+  position: relative;
+  transition: width var(--transition-speed) ease, transform var(--transition-speed) ease;
 }
 
+.app-sidebar.collapsed {
+  width: 40px;
+  overflow: hidden;
+}
+
+/* Simple toggle button */
+.sidebar-toggle {
+  position: absolute;
+  top: 10px;
+  right: -40px; /* Position outside the sidebar by default */
+  width: 40px;
+  height: 40px;
+  background-color: var(--app-accent-color);
+  border: none;
+  border-radius: 0 4px 4px 0;
+  color: white;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10;
+}
+
+.app-sidebar.collapsed .sidebar-toggle {
+  right: auto; /* Reset right positioning */
+  left: 0; /* Position at the left edge when collapsed */
+  border-radius: 4px;
+}
+
+.sidebar-toggle:hover {
+  background-color: #2563eb;
+}
+
+/* Main content area */
 .app-content-wrapper {
   flex: 1;
+  min-width: 0; /* Prevents flex items from overflowing */
   display: flex;
   flex-direction: column;
 }
@@ -101,6 +138,9 @@ body {
   flex-direction: column;
   background-color: var(--app-bg-color);
   padding: 1.5rem;
+  overflow: hidden; /* Prevents overflow */
+  height: calc(100vh - 220px); /* Calculate height based on viewport minus header, footer and tabs */
+  min-height: 400px; /* Minimum height as a fallback */
 }
 
 .app-footer {
@@ -118,32 +158,63 @@ body {
   color: rgba(255, 255, 255, 0.4);
 }
 
-/* Project-based layout styles */
-.section-title {
-  margin-top: 0;
-  margin-bottom: 1.5rem;
-  font-size: 1.5rem;
-  color: var(--app-text-color);
-}
-
+/* Chat interface */
 .chat-interface {
   display: flex;
   gap: 1.5rem;
-  height: 600px;
+  height: 100%; /* Fill available height instead of fixed 600px */
+  min-height: 600px; /* Maintain a minimum height */
+  position: relative;
+  flex: 1; /* Take up all available space */
 }
 
 .chat-sidebar {
-  width: 300px;
-  flex-shrink: 0;
+  width: var(--chat-sidebar-width);
+  position: relative;
+  transition: width var(--transition-speed) ease;
+}
+
+.chat-sidebar.collapsed {
+  width: 40px; /* Keep enough width for the button to be visible */
+  overflow: hidden;
+}
+
+.chat-sidebar-toggle {
+  position: absolute;
+  top: 10px;
+  right: -40px; /* Position outside by default */
+  width: 40px;
+  height: 40px;
+  background-color: var(--app-accent-color);
+  border: none;
+  border-radius: 0 4px 4px 0;
+  color: white;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10;
+}
+
+.chat-sidebar.collapsed .chat-sidebar-toggle {
+  right: auto; /* Reset right positioning */
+  left: 0; /* Position at the left edge when collapsed */
+  border-radius: 4px;
+}
+
+.chat-sidebar-toggle:hover {
+  background-color: #2563eb;
 }
 
 .chat-main {
   flex: 1;
+  min-width: 0;
   background-color: rgba(255, 255, 255, 0.05);
   border-radius: 0.5rem;
   overflow: hidden;
   display: flex;
   flex-direction: column;
+  min-height: 300px; /* Ensure a minimum height */
 }
 
 .no-chat-selected {
@@ -155,4 +226,189 @@ body {
   text-align: center;
   color: rgba(255, 255, 255, 0.5);
   font-style: italic;
+}
+
+/* Responsive styles */
+@media (max-width: 1024px) {
+  :root {
+    --sidebar-width: 250px;
+    --chat-sidebar-width: 250px;
+  }
+  
+  .chat-interface {
+    min-height: 500px;
+  }
+}
+
+@media (max-width: 768px) {
+  .app-main {
+    position: relative;
+  }
+
+  .app-sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    height: 100%;
+    z-index: 100;
+    width: 80%;
+    max-width: 300px;
+    transform: translateX(0); /* Reset transform */
+  }
+  
+  .app-sidebar.collapsed {
+    transform: translateX(-100%); /* Move off-screen */
+    width: 100%;
+  }
+  
+  .sidebar-toggle {
+    position: fixed;
+    top: 20px;
+    left: 0;
+    right: auto;
+    border-radius: 0 4px 4px 0;
+    z-index: 90;
+  }
+  
+  .app-sidebar.collapsed .sidebar-toggle {
+    left: 0; /* Keep the toggle visible */
+  }
+  
+  .app-content-wrapper {
+    padding-top: 60px; /* Space for the fixed toggle button */
+  }
+  
+  .app-tabs {
+    padding-left: 1rem;
+  }
+  
+  /* Mobile overlay */
+  .sidebar-overlay {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5);
+    z-index: 99;
+  }
+  
+  .sidebar-overlay.active {
+    display: block;
+  }
+  
+  /* Chat layout on mobile */
+  .chat-interface {
+    flex-direction: column;
+    height: auto;
+    min-height: 500px;
+  }
+  
+  .chat-sidebar {
+    width: 100%;
+    max-height: 200px;
+    margin-bottom: 1.5rem;
+  }
+  
+  .chat-sidebar.collapsed {
+    max-height: 40px; /* Keep enough height for the button */
+    margin-bottom: 1rem;
+    width: 100%;
+    overflow: hidden;
+  }
+  
+  .chat-sidebar-toggle {
+    top: 0;
+    left: 50%; /* Center the toggle in mobile view */
+    right: auto;
+    transform: translateX(-50%);
+    border-radius: 0 0 4px 4px;
+  }
+  
+  .chat-sidebar.collapsed .chat-sidebar-toggle {
+    top: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    border-radius: 0 0 4px 4px;
+  }
+  
+  .chat-main {
+    min-height: 350px;
+  }
+  
+  .app-content {
+    height: auto; /* Allow height to be determined by content on mobile */
+    min-height: calc(100vh - 250px); /* Still maintain a good minimum height */
+  }
+}
+
+@media (max-width: 480px) {
+  .app-tabs button {
+    padding: 0.75rem 1rem;
+    font-size: 0.9rem;
+  }
+  
+  .app-header h1 {
+    font-size: 1.5rem;
+  }
+  
+  .app-header p {
+    font-size: 0.9rem;
+  }
+}
+
+/* Ensure content inside chat fills available space */
+.chat-messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+}
+
+.chat-input-area {
+  padding: 1rem;
+  border-top: 1px solid var(--app-border-color);
+  background-color: rgba(255, 255, 255, 0.03);
+}
+
+.chat-input-container {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.chat-input-field {
+  flex: 1;
+  padding: 0.75rem;
+  background-color: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 0.25rem;
+  color: white;
+  font-size: 1rem;
+  resize: none;
+  min-height: 50px;
+}
+
+.chat-send-button {
+  background-color: var(--app-accent-color);
+  color: white;
+  border: none;
+  border-radius: 0.25rem;
+  padding: 0 1rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.chat-send-button:hover:not(:disabled) {
+  background-color: #2563eb;
+}
+
+/* Make sure Chat component fills its container */
+.chat-container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  width: 100%;
 } 
