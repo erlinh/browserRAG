@@ -15,24 +15,24 @@ export interface ModelOption {
 export const MODEL_OPTIONS: ModelOption[] = [
   {
     id: 'onnx-community/DeepSeek-R1-Distill-Qwen-1.5B-ONNX',
-    name: 'DeepSeek R1 Distill (Default)',
+    name: 'DeepSeek R1 Distill - WebGPU (Default)',
     size: '1.5B',
     quality: 'Good',
     speed: 'Medium',
   },
   {
     id: 'onnx-community/Pleias-Pico',
-    name: 'Pleias-Pico',
-    size: '1.3B',
+    name: 'Pleias-Pico (CPU)',
+    size: '350M',
     quality: 'Good',
     speed: 'Fast',
   },
   {
     id: 'onnx-community/Pleias-Nano',
-    name: 'Pleias-Nano',
-    size: '2.7B',
-    quality: 'Better',
-    speed: 'Medium',
+    name: 'Pleias-Nano (CPU)',
+    size: '1.2B',
+    quality: 'Slow',
+    speed: 'Very Slow',
   }
 ];
 
