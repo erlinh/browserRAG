@@ -25,6 +25,8 @@ import {
   deleteDocumentFromProject
 } from './services/projectService';
 import './App.css';
+import { MODEL_OPTIONS } from './contexts/ModelContext';
+import { initializeLLM, generateResponse } from './services/llmService';
 
 function App() {
   const [isDbReady, setIsDbReady] = useState(false);
@@ -336,6 +338,75 @@ function App() {
   // Convert DocumentInfo[] to string[] for Chat component
   const documentNames = documents.map(doc => doc.name);
 
+  // Test model function
+  const testModel = async (modelId: string) => {
+    try {
+      console.log(`Testing model: ${modelId}`);
+      
+      const isPleiasModel = modelId.includes('Pleias');
+      
+      if (isPleiasModel) {
+        console.log(`Note: ${modelId} will use CPU (WASM) instead of WebGPU due to compatibility issues`);
+      }
+      
+      // Initialize the model
+      await initializeLLM(modelId, (progress) => {
+        console.log(`Model load progress: ${progress.message} (${progress.progress ? Math.round(progress.progress) : '?'}%)`);
+      });
+      
+      // Sample test prompt for each model type
+      let prompt;
+      
+      if (isPleiasModel) {
+        // Pleias-specific prompt format
+        prompt = `
+<|query_start|>What is the capital of France?<|query_end|>
+<|source_start|><|source_id_start|>source_1<|source_id_end|>Paris is the capital and most populous city of France, with an estimated population of 2,175,601 residents as of 2018. The city of Paris is the centre of the Île-de-France region, or Paris Region, with an estimated population of 12,174,880.<|source_end|>
+<|source_start|><|source_id_start|>source_2<|source_id_end|>France, officially the French Republic, is a country primarily located in Western Europe. It also comprises overseas regions and territories in the Americas and the Atlantic, Pacific and Indian Oceans. Its metropolitan area extends from the Rhine to the Atlantic Ocean and from the Mediterranean Sea to the English Channel and the North Sea.<|source_end|>
+<|source_analysis_start|>
+`.trim();
+      } else {
+        // DeepSeek prompt format
+        prompt = `You are a helpful assistant that answers questions based on the provided context from documents.
+
+CONTEXT:
+Paris is the capital and most populous city of France, with an estimated population of 2,175,601 residents as of 2018. The city of Paris is the centre of the Île-de-France region, or Paris Region, with an estimated population of 12,174,880.
+
+SOURCES:
+France Travel Guide (Page 5)
+
+USER QUESTION:
+What is the capital of France?
+
+Please provide a comprehensive answer to the question based ONLY on the information in the CONTEXT.`;
+      }
+      
+      // Generate response
+      const response = await generateResponse(prompt, modelId, undefined, (token) => {
+        // Optional: Do something with streaming tokens if needed
+      });
+      
+      console.log(`Model ${modelId} response:`);
+      console.log(response);
+      
+      return response;
+    } catch (error) {
+      console.error(`Error testing model ${modelId}:`, error);
+      return `Error: ${error instanceof Error ? error.message : String(error)}`;
+    }
+  };
+  
+  // Add a function to test all models
+  const testAllModels = async () => {
+    const results: Record<string, string> = {};
+    
+    for (const model of MODEL_OPTIONS) {
+      results[model.id] = await testModel(model.id);
+    }
+    
+    console.log('All model test results:', results);
+  };
+
   return (
     <div className="app-container">
       <header className="app-header">
@@ -352,11 +423,12 @@ function App() {
         <aside className={`app-sidebar ${projectSidebarCollapsed ? 'collapsed' : ''}`}>
           <button 
             className="sidebar-toggle" 
-            onClick={toggleProjectSidebar}
+            onClick={toggleProjectSidebar} 
             aria-label={projectSidebarCollapsed ? "Show projects" : "Hide projects"}
           >
             {projectSidebarCollapsed ? "+" : "−"}
           </button>
+          
           <ProjectSelector 
             projects={projects} 
             selectedProjectId={selectedProject?.id || ''} 
@@ -373,12 +445,11 @@ function App() {
                 className={activeTab === 'upload' ? 'active' : ''} 
                 onClick={() => setActiveTab('upload')}
               >
-                Upload Documents
+                Documents
               </button>
               <button 
                 className={activeTab === 'chat' ? 'active' : ''} 
                 onClick={() => setActiveTab('chat')}
-                disabled={totalDocuments === 0}
               >
                 Chat
               </button>
@@ -387,7 +458,7 @@ function App() {
             {/* Show chat sidebar toggle only when in chat tab */}
             {activeTab === 'chat' && (
               <div className="app-tabs-actions">
-                <button 
+                <button
                   className="chat-sidebar-toggle" 
                   onClick={toggleChatSidebar}
                   aria-label={chatSidebarCollapsed ? "Show chats" : "Hide chats"}
@@ -434,7 +505,7 @@ function App() {
                   ) : (
                     <div className="no-chat-selected">
                       {totalDocuments === 0 ? 
-                        "Upload documents first to start chatting" : 
+                        "You can start chatting without documents, or upload documents for document-based answers" : 
                         "Select or create a chat to begin"
                       }
                     </div>

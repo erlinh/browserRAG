@@ -6,6 +6,11 @@ import { ModelInfo } from './modelPersistenceService';
 // Define a type for progress callback
 export type ProgressCallback = (stage: string, progress: number) => void;
 
+// Check if the model is a Pleias model
+const isPleiasModel = (modelId: string): boolean => {
+  return modelId.includes('Pleias');
+};
+
 /**
  * Query documents using RAG (Retrieval Augmented Generation)
  */
@@ -20,7 +25,34 @@ export const queryDocuments = async (
   try {
     // Check if we have documents
     if (!documentNames || documentNames.length === 0) {
-      return `There are no documents uploaded to this project yet. Please upload some documents first.`;
+      // Instead of returning an error message, use the LLM as a general conversational AI
+      if (progressCallback) {
+        progressCallback('generation', 60);
+      }
+      
+      // Create a conversational prompt
+      const conversationalPrompt = constructConversationalPrompt(question);
+      
+      // Generate response with the LLM
+      const response = await generateResponse(
+        conversationalPrompt, 
+        model.id,
+        (progress) => {
+          if (progressCallback) {
+            // Map the LLM progress to our progress range (60-100%)
+            const mappedProgress = 60 + (progress.progress || 0) * 0.4;
+            progressCallback(progress.stage || 'generation', mappedProgress);
+          }
+        },
+        streamCallback  // Pass the stream callback to generateResponse
+      );
+      
+      // Update progress
+      if (progressCallback) {
+        progressCallback('complete', 100);
+      }
+      
+      return response;
     }
 
     // Log for debugging
@@ -83,7 +115,12 @@ export const queryDocuments = async (
     }
     
     // 3. Construct a prompt with the retrieved chunks
-    const prompt = constructRAGPrompt(question, similarChunks, alternateResponse);
+    let prompt;
+    if (isPleiasModel(model.id)) {
+      prompt = constructPleiasRAGPrompt(question, similarChunks, alternateResponse);
+    } else {
+      prompt = constructRAGPrompt(question, similarChunks, alternateResponse);
+    }
     
     // Update progress
     if (progressCallback) {
@@ -124,6 +161,42 @@ export const queryDocuments = async (
     
     return `An error occurred while processing your question: ${errorMessage}. Please try again or check the console for more details.`;
   }
+};
+
+/**
+ * Construct a prompt for RAG with Pleias models
+ */
+const constructPleiasRAGPrompt = (
+  question: string,
+  contexts: Array<{ id: string; text: string; score: number; metadata: Record<string, any> }>,
+  alternateResponse: string = ''
+): string => {
+  // Format contexts as sources with IDs for Pleias models
+  let sourcesContent = '';
+  
+  // Sort contexts by score (highest first)
+  contexts.sort((a, b) => b.score - a.score);
+  
+  // Construct sources - assign unique IDs to each chunk
+  contexts.forEach((ctx, index) => {
+    // Generate a hex ID that looks like the example (8 characters)
+    const sourceId = (ctx.metadata.documentId || ctx.id || '')
+      .substring(0, 8)
+      .padEnd(8, '0')
+      .replace(/[^a-f0-9]/gi, '0');
+    
+    sourcesContent += `<|source_start|><|source_id_start|>${sourceId}<|source_id_end|>${ctx.text.trim()}<|source_end|>\n`;
+  });
+  
+  // Format the prompt according to Pleias model requirements
+  const prompt = `
+<|query_start|>${question.trim()}<|query_end|>
+${sourcesContent}
+<|source_analysis_start|>
+`.trim();
+  
+  console.log('Constructed Pleias RAG prompt:', prompt.substring(0, 200) + '...');
+  return prompt;
 };
 
 /**
@@ -210,4 +283,19 @@ export const initializeRAG = async (
     console.error('Error initializing RAG:', error);
     throw error;
   }
+};
+
+/**
+ * Construct a prompt for general conversational interactions
+ */
+const constructConversationalPrompt = (
+  question: string
+): string => {
+  return `You are a helpful AI assistant that provides informative, accurate, and friendly responses to questions.
+
+USER QUESTION:
+${question}
+
+Please respond in a conversational and helpful manner. If you don't know the answer to a question, be honest about your limitations rather than making up information.
+`;
 }; 

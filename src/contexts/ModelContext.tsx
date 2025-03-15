@@ -19,6 +19,20 @@ export const MODEL_OPTIONS: ModelOption[] = [
     size: '1.5B',
     quality: 'Good',
     speed: 'Medium',
+  },
+  {
+    id: 'onnx-community/Pleias-Pico',
+    name: 'Pleias-Pico',
+    size: '1.3B',
+    quality: 'Good',
+    speed: 'Fast',
+  },
+  {
+    id: 'onnx-community/Pleias-Nano',
+    name: 'Pleias-Nano',
+    size: '2.7B',
+    quality: 'Better',
+    speed: 'Medium',
   }
 ];
 

@@ -31,6 +31,11 @@ const isChatModel = (modelId: string): boolean => {
   return modelId.includes('DeepSeek') || modelId.includes('Qwen') || modelId.includes('Phi-3');
 };
 
+// Check if the model is a Pleias model
+const isPleiasModel = (modelId: string): boolean => {
+  return modelId.includes('Pleias');
+};
+
 /**
  * Set whether to use WebGPU (if available)
  */
@@ -149,7 +154,23 @@ export const initializeLLM = async (
     }
     
     // Determine which device to use
-    const device = useWebGPU && 'gpu' in navigator ? 'webgpu' : 'wasm';
+    // Force WASM (CPU) for Pleias models as they don't work with WebGPU
+    const device = isPleiasModel(modelId) 
+      ? 'wasm' 
+      : (useWebGPU && 'gpu' in navigator ? 'webgpu' : 'wasm');
+    
+    if (isPleiasModel(modelId) && useWebGPU && 'gpu' in navigator) {
+      console.log(`Using WASM (CPU) for ${modelId} instead of WebGPU due to compatibility issues`);
+      
+      if (progressCallback) {
+        progressCallback({
+          status: 'loading',
+          message: `Using CPU for ${modelId} (WebGPU not compatible)`,
+          progress: 35,
+          stage: 'model'
+        });
+      }
+    }
     
     try {
       // Load model with the selected device
@@ -249,7 +270,7 @@ const createStoppingCriteria = () => {
   return stoppingCriteria;
 };
 
-// Create a stopping criteria function when needed
+// Create stopping criteria function when needed
 const getStoppingCriteria = (() => {
   let criteria: any = null;
   
@@ -278,6 +299,41 @@ const emitStreamedTextEvent = (text: string) => {
 };
 
 /**
+ * Construct a prompt for Pleias models
+ */
+const constructPleiasPrompt = (prompt: string): string => {
+  // For Pleias models, we need to format the prompt to include query and sources
+  // This is a simplified version, assuming the prompt already has the structure we need
+  return prompt.trim();
+};
+
+/**
+ * Process output from Pleias models
+ * Pleias output has a specific format that needs to be parsed
+ */
+const processPleiasOutput = (output: string): string => {
+  // Only extract the meaningful content for UI display
+  
+  // If the output contains source_analysis_start, we are in the analysis phase
+  if (output.includes('<|source_analysis_start|>')) {
+    // Extract the part that comes after source_analysis_start tag
+    const analysisStartIndex = output.indexOf('<|source_analysis_start|>') + '<|source_analysis_start|>'.length;
+    
+    // Return just the analysis part (the actual response)
+    return output.substring(analysisStartIndex).trim();
+  }
+  
+  // If we're still receiving the beginning part of the response, show a loading indicator
+  if (output.includes('<|query_start|>') && !output.includes('<|source_analysis_start|>')) {
+    // Still in query or source section, show that we're processing
+    return "Processing your query...";
+  }
+  
+  // Default - return the original output if we can't parse it in a specific way
+  return output.trim();
+};
+
+/**
  * Generate response from the LLM model
  */
 export const generateResponse = async (
@@ -296,7 +352,20 @@ export const generateResponse = async (
         stage: 'model-load'
       });
     }
-    await initializeLLM(modelId, progressCallback);
+    try {
+      await initializeLLM(modelId, progressCallback);
+    } catch (error) {
+      // If the model failed to load and it's a Pleias model, provide a more helpful error message
+      if (isPleiasModel(modelId)) {
+        console.error(`Failed to load Pleias model (${modelId}):`, error);
+        
+        // Return a user-friendly error message
+        return `Failed to load the Pleias model. These models require CPU processing and may be slower. Error details: ${error instanceof Error ? error.message : String(error)}`;
+      }
+      
+      // Re-throw the error for non-Pleias models
+      throw error;
+    }
   }
   
   const model = modelCache[modelId].model;
@@ -348,14 +417,25 @@ export const generateResponse = async (
         return;
       }
       
-      // For regular output, add to normal buffer and call the stream callback
+      // For regular output, add to normal buffer
       normalOutputBuffer += token;
       
-      // Emit the updated text content
-      emitStreamedTextEvent(normalOutputBuffer);
+      // Process the current output - helps with streaming by processing as we go
+      const processedOutput = isPleiasModel(modelId) 
+        ? processPleiasOutput(normalOutputBuffer)
+        : normalOutputBuffer;
       
+      // Log streaming for Pleias models to help debugging
+      if (isPleiasModel(modelId)) {
+        console.log('Processing Pleias output:', processedOutput.substring(0, Math.min(50, processedOutput.length)) + '...');
+      }
+      
+      // First update custom event listeners (for backward compatibility)
+      emitStreamedTextEvent(processedOutput);
+      
+      // Then call the direct callback if provided
       if (streamCallback) {
-        streamCallback(normalOutputBuffer);
+        streamCallback(processedOutput);
       }
     };
     
@@ -366,16 +446,24 @@ export const generateResponse = async (
       callback_function: tokenCallbackFunction,
     });
     
-    // Add thinking tag hint to the prompt to encourage model to use thinking
     let enhancedPrompt = prompt;
-    if (!prompt.includes('<think>')) {
+    
+    // Determine the appropriate prompt format based on the model
+    if (isPleiasModel(modelId)) {
+      // For Pleias models, we use a different format
+      enhancedPrompt = constructPleiasPrompt(prompt);
+    } else if (!prompt.includes('<think>')) {
+      // Add thinking tag hint for non-Pleias models
       enhancedPrompt = `${prompt}\n\nYou can use <think>...</think> tags to show your thinking process.`;
     }
     
     let inputs;
     
     // Handle different model types appropriately
-    if (isChatModel(modelId)) {
+    if (isPleiasModel(modelId)) {
+      // For Pleias models, use direct tokenization
+      inputs = tokenizer(enhancedPrompt, { return_tensors: 'pt' });
+    } else if (isChatModel(modelId)) {
       // For chat models, use the chat template
       const messages = [
         { role: 'user', content: enhancedPrompt }
@@ -397,9 +485,9 @@ export const generateResponse = async (
     const output = await model.generate({
       ...inputs,
       max_new_tokens: 1024,
-      do_sample: true,
-      temperature: 0.7,
-      top_p: 0.95,
+      do_sample: isPleiasModel(modelId) ? false : true, // Use greedy decoding for Pleias
+      temperature: isPleiasModel(modelId) ? 0.0 : 0.7, // Use lower temperature for Pleias
+      top_p: isPleiasModel(modelId) ? 1.0 : 0.95, // Use different top_p for Pleias
       stopping_criteria: [stoppingCriteria],  // Pass as array
       streamer: streamer,
     });
@@ -413,7 +501,10 @@ export const generateResponse = async (
       });
     }
     
-    return normalOutputBuffer;
+    // Return the processed output, especially important for Pleias models
+    return isPleiasModel(modelId)
+      ? processPleiasOutput(normalOutputBuffer)
+      : normalOutputBuffer;
   } catch (error) {
     console.error('Error generating response:', error);
     if (progressCallback) {

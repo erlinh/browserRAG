@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useLayoutEffect } from 'react';
 import { queryDocuments, ProgressCallback } from '../services/ragService';
 import { useModel } from '../contexts/ModelContext';
 import { ChatSession, ChatMessage as StoredChatMessage, addMessageToChatSession } from '../services/projectService';
@@ -6,6 +6,19 @@ import ModelSelector from './ModelSelector';
 import ProgressBar, { ProgressInfo } from './ProgressBar';
 import { ModelInfo } from '../services/modelPersistenceService';
 import './Chat.css';
+
+// Debounce utility to prevent excessive verification calls
+const debounce = <T extends (...args: any[]) => any>(fn: T, ms = 300) => {
+  let timeoutId: ReturnType<typeof setTimeout>;
+  return function(this: any, ...args: Parameters<T>) {
+    clearTimeout(timeoutId);
+    timeoutId = setTimeout(() => fn.apply(this, args), ms);
+  };
+};
+
+// A simple cache to store the last verification result
+const verificationCache: Record<string, { timestamp: number, result: any }> = {};
+const VERIFICATION_CACHE_TIMEOUT = 10000; // 10 seconds
 
 interface Message {
   id: string;
@@ -52,19 +65,47 @@ const Chat: React.FC<ChatProps> = ({ documents, projectId, chatId, chatSession }
     }
   };
 
-  // Check for document embeddings when component mounts or documents change
+  // Verify embeddings on mount or when projectId changes
   useEffect(() => {
     const verifyEmbeddings = async () => {
-      if (documents.length === 0) {
+      if (!projectId) {
         setEmbeddingsVerified(false);
         return;
       }
       
       try {
+        // Check cache first
+        const now = Date.now();
+        if (verificationCache[projectId] && 
+            (now - verificationCache[projectId].timestamp) < VERIFICATION_CACHE_TIMEOUT) {
+          // Use cached result
+          const cachedResult = verificationCache[projectId].result;
+          setEmbeddingsVerified(cachedResult.exists);
+          
+          if (!cachedResult.exists) {
+            setError('Warning: No document embeddings found. Chat may not work properly. Try refreshing the page or re-uploading the documents.');
+          } else {
+            setError(null);
+          }
+          return;
+        }
+        
+        // If not in cache, perform verification
         const { verifyEmbeddings } = await import('../services/vectorStore');
         const verification = verifyEmbeddings(undefined, projectId);
         
-        console.log(`Chat embeddings verification for project ${projectId}:`, verification);
+        // Only log on first verification or when status changes
+        if (!verificationCache[projectId] || 
+            verificationCache[projectId].result.exists !== verification.exists) {
+          console.log(`Chat embeddings verification for project ${projectId}:`, verification);
+        }
+        
+        // Cache the result
+        verificationCache[projectId] = {
+          timestamp: now,
+          result: verification
+        };
+        
         setEmbeddingsVerified(verification.exists);
         
         if (!verification.exists) {
@@ -75,11 +116,15 @@ const Chat: React.FC<ChatProps> = ({ documents, projectId, chatId, chatSession }
       } catch (error) {
         console.error('Error verifying embeddings:', error);
         setEmbeddingsVerified(false);
+        setError('Failed to verify document embeddings. Chat may not work properly.');
       }
     };
+
+    // Create a debounced version to prevent multiple rapid calls
+    const debouncedVerify = debounce(verifyEmbeddings, 500);
+    debouncedVerify();
     
-    verifyEmbeddings();
-  }, [documents, projectId]);
+  }, [projectId]);
 
   // Function to manually reinitialize the vector store
   const handleReinitializeVectorStore = async () => {
@@ -130,37 +175,12 @@ const Chat: React.FC<ChatProps> = ({ documents, projectId, chatId, chatSession }
       });
     };
 
-    // Add event listener for streamed text
-    const handleStreamedText = (event: CustomEvent<{ text: string }>) => {
-      setMessages(prev => {
-        const newMessages = [...prev];
-        // Find the last assistant message that is associated with the current question
-        const lastAssistantIndex = newMessages.findIndex(
-          m => m.role === 'assistant' && 
-               !m.isThinking && 
-               m.associatedQuestionId === currentQuestionRef.current
-        );
-        
-        if (lastAssistantIndex !== -1) {
-          // Update the content with the streamed text
-          newMessages[lastAssistantIndex] = {
-            ...newMessages[lastAssistantIndex],
-            content: event.detail.text,
-            isStreaming: true
-          };
-        }
-        return newMessages;
-      });
-    };
-
     // Add event listeners
     window.addEventListener('thinking', handleThinking as EventListener);
-    window.addEventListener('streamedText', handleStreamedText as EventListener);
     
     // Clean up
     return () => {
       window.removeEventListener('thinking', handleThinking as EventListener);
-      window.removeEventListener('streamedText', handleStreamedText as EventListener);
     };
   }, []);
 
@@ -177,10 +197,18 @@ const Chat: React.FC<ChatProps> = ({ documents, projectId, chatId, chatSession }
       
       // If there are no messages, add a welcome message
       if (uiMessages.length === 0) {
+        let welcomeContent = '';
+        
+        if (documents.length > 0) {
+          welcomeContent = `Hello! I'm ready to answer questions about your ${documents.length} document(s) in the "${chatSession.name}" chat. What would you like to know?`;
+        } else {
+          welcomeContent = `Hello! Welcome to the "${chatSession.name}" chat. No documents have been uploaded yet, but you can still chat with me as a general conversational AI. You can also upload documents at any time for more specific document-based answers. What would you like to talk about?`;
+        }
+        
         const welcomeMessage: Message = {
           id: Date.now().toString(),
           role: 'assistant',
-          content: `Hello! I'm ready to answer questions about your ${documents.length} document(s) in the "${chatSession.name}" chat. What would you like to know?`,
+          content: welcomeContent,
           timestamp: new Date(),
         };
         
@@ -306,10 +334,26 @@ const Chat: React.FC<ChatProps> = ({ documents, projectId, chatId, chatSession }
       
       // Set up a stream callback for response text
       const streamCallback = (text: string) => {
-        const event = new CustomEvent('streamedText', { 
-          detail: { text }
+        // Directly update messages state instead of using custom events
+        setMessages(prev => {
+          const newMessages = [...prev];
+          // Find the last assistant message that is associated with the current question
+          const lastAssistantIndex = newMessages.findIndex(
+            m => m.role === 'assistant' && 
+                !m.isThinking && 
+                m.associatedQuestionId === userMessageId
+          );
+          
+          if (lastAssistantIndex !== -1) {
+            // Update the content with the streamed text
+            newMessages[lastAssistantIndex] = {
+              ...newMessages[lastAssistantIndex],
+              content: text,
+              isStreaming: true
+            };
+          }
+          return newMessages;
         });
-        window.dispatchEvent(event);
       };
 
       // Query documents with streaming
