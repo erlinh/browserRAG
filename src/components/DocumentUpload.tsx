@@ -77,6 +77,24 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
               setProcessingDetails(prev => [...prev, `Storing document embeddings in vector database...`]);
             }
           });
+          
+          // Verify embeddings immediately after processing
+          try {
+            const { verifyEmbeddings } = await import('../services/vectorStore');
+            const verification = verifyEmbeddings(documentInfo.id, projectId);
+            if (verification.exists) {
+              setProcessingDetails(prev => [...prev, 
+                `✅ Document processed successfully with ${verification.count} embeddings.`
+              ]);
+            } else {
+              setProcessingDetails(prev => [...prev, 
+                `⚠️ Warning: Document processed but embeddings verification failed. Chat may not work properly.`
+              ]);
+            }
+          } catch (error) {
+            console.error('Error verifying document embeddings:', error);
+          }
+          
           setProcessingDetails(prev => [...prev, `Document processed and saved with ID: ${documentInfo.id}`]);
           onDocumentProcessed(documentInfo.id, documentInfo.name);
         } else if (fileType === 'csv') {
@@ -109,6 +127,24 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
             // Calculate overall progress, balancing between parsing (50%) and embedding (50%)
             setUploadProgress(50 + Math.round(progress * 0.5));
           });
+          
+          // Verify embeddings immediately after processing
+          try {
+            const { verifyEmbeddings } = await import('../services/vectorStore');
+            const verification = verifyEmbeddings(documentInfo.id, projectId);
+            if (verification.exists) {
+              setProcessingDetails(prev => [...prev, 
+                `✅ Document processed successfully with ${verification.count} embeddings.`
+              ]);
+            } else {
+              setProcessingDetails(prev => [...prev, 
+                `⚠️ Warning: Document processed but embeddings verification failed. Chat may not work properly.`
+              ]);
+            }
+          } catch (error) {
+            console.error('Error verifying document embeddings:', error);
+          }
+          
           setProcessingDetails(prev => [...prev, `CSV document processed and saved with ID: ${documentInfo.id}`]);
           onDocumentProcessed(documentInfo.id, documentInfo.name);
         } else {

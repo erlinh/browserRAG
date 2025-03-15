@@ -72,15 +72,33 @@ function App() {
   useEffect(() => {
     const setupDatabase = async () => {
       try {
+        console.log('Setting up database and vector store...');
+        
         // Initialize Vector Store
         await initializeVectorStore();
         
         // Initialize project data
         initializeProjectData();
         
+        // Verify embeddings for existing projects
+        const availableProjects = getProjects();
+        
+        if (availableProjects.length > 0) {
+          const verifyStore = await import('./services/vectorStore').then(module => module.verifyEmbeddings);
+          
+          for (const project of availableProjects) {
+            const verificationResult = verifyStore(undefined, project.id);
+            console.log(`Project ${project.id} (${project.name}) embeddings verification:`, verificationResult);
+          }
+        }
+        
         setIsDbReady(true);
+        console.log('Database setup complete');
       } catch (error) {
         console.error('Failed to initialize database:', error);
+        
+        // Show an error message to the user (you may want to set this in state)
+        alert('Failed to initialize the application. Please refresh the page and try again.');
       }
     };
 
@@ -111,10 +129,25 @@ function App() {
   // Load documents when project or page changes
   useEffect(() => {
     if (selectedProject) {
-      const loadDocuments = () => {
+      const loadDocuments = async () => {
         const result = getProjectDocuments(selectedProject.id, currentPage, pageSize);
         setDocuments(result.documents);
         setTotalDocuments(result.total);
+        
+        // Verify that documents have embeddings
+        if (result.documents.length > 0) {
+          try {
+            const { verifyEmbeddings } = await import('./services/vectorStore');
+            const verificationResult = verifyEmbeddings(undefined, selectedProject.id);
+            console.log(`Document embeddings verification for project ${selectedProject.id}:`, verificationResult);
+            
+            if (!verificationResult.exists && result.documents.length > 0) {
+              console.warn('Documents exist but no embeddings found! This may cause chat to fail.');
+            }
+          } catch (error) {
+            console.error('Error verifying document embeddings:', error);
+          }
+        }
       };
 
       loadDocuments();
@@ -167,11 +200,11 @@ function App() {
     }
   };
 
-  const handleDeleteDocument = (documentId: string) => {
+  const handleDeleteDocument = async (documentId: string) => {
     if (!selectedProject) return;
     
     // First, delete from project documents
-    const success = deleteDocumentFromProject(selectedProject.id, documentId);
+    const success = await deleteDocumentFromProject(selectedProject.id, documentId);
     
     if (success) {
       // Also delete document chunks from vector store

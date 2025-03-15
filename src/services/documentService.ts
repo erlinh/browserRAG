@@ -137,7 +137,7 @@ export const processPdfDocument = async (
       }
     });
     
-    // Store embeddings in vector store
+    // Store embeddings in vector database
     await storeEmbeddings(
       documentId,
       chunks.map(chunk => chunk.id),
@@ -146,7 +146,23 @@ export const processPdfDocument = async (
       chunks.map(chunk => chunk.metadata)
     );
     
-    // Create document info
+    // Verify embeddings were stored correctly
+    const verificationResult = await import('./vectorStore').then(module => 
+      module.verifyEmbeddings(documentId, projectId)
+    );
+    
+    console.log(`Document embedding verification:`, verificationResult);
+    
+    if (!verificationResult.exists || verificationResult.count === 0) {
+      console.error(`Failed to verify embeddings for document ${documentId}`);
+      throw new Error('Document embeddings were not stored correctly. Please try again.');
+    }
+    
+    if (progressCallback) {
+      progressCallback(100);
+    }
+    
+    // Create and store document info
     const documentInfo: DocumentInfo = {
       id: documentId,
       name: fileName,
@@ -154,15 +170,13 @@ export const processPdfDocument = async (
       type: 'pdf'
     };
     
-    // Add to project
-    addDocumentToProject(projectId, documentInfo);
-    
-    if (progressCallback) {
-      progressCallback(100);
+    // Add document to project
+    const added = await addDocumentToProject(projectId, documentInfo);
+    if (!added) {
+      throw new Error(`Failed to add document ${documentId} to project ${projectId}`);
     }
     
     return documentInfo;
-    
   } catch (error) {
     console.error(`Error processing PDF document ${fileName}:`, error);
     throw error;
@@ -294,6 +308,22 @@ export const processCsvDocument = async (
           
           console.log(`Processed ${processedRows} rows from ${fileName}`);
           
+          // Ensure vector store is loaded with the latest data
+          await import('./vectorStore').then(module => module.initializeVectorStore());
+          
+          // Verify embeddings were stored correctly before proceeding
+          const verificationResult = await import('./vectorStore').then(module => 
+            module.verifyEmbeddings(documentId, projectId)
+          );
+          
+          console.log(`Final CSV document embedding verification:`, verificationResult);
+          
+          if (!verificationResult.exists || verificationResult.count === 0) {
+            console.error(`Failed to verify embeddings for document ${documentId}`);
+            reject(new Error('Document embeddings were not stored correctly. Please try again.'));
+            return;
+          }
+          
           if (progressCallback) {
             progressCallback(100);
           }
@@ -306,8 +336,12 @@ export const processCsvDocument = async (
             type: 'csv'
           };
           
-          // Add to project
-          addDocumentToProject(projectId, documentInfo);
+          // Add to project with await
+          const added = await addDocumentToProject(projectId, documentInfo);
+          if (!added) {
+            reject(new Error(`Failed to add document ${documentId} to project ${projectId}`));
+            return;
+          }
           
           console.log(`CSV document successfully processed: ${fileName}`);
           resolve(documentInfo);
@@ -354,6 +388,16 @@ async function processChunk(
       texts,
       chunk.map(item => item.metadata)
     );
+    
+    // Verify embeddings were stored correctly
+    const verificationResult = await import('./vectorStore').then(module => 
+      module.verifyEmbeddings(documentId, projectId)
+    );
+    
+    if (!verificationResult.exists) {
+      console.error(`Failed to verify embeddings for chunk ${chunkNumber} of ${fileName}`);
+      console.log('Verification details:', verificationResult.details);
+    }
     
     console.log(`Processed chunk ${chunkNumber} of ${totalChunks} for ${fileName}`);
   } catch (error) {

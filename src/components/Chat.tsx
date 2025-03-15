@@ -32,11 +32,66 @@ const Chat: React.FC<ChatProps> = ({ documents, projectId, chatId, chatSession }
   const [input, setInput] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [embeddingsVerified, setEmbeddingsVerified] = useState<boolean | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const currentQuestionRef = useRef<string | null>(null);
   
   // Get model context
   const { selectedModel, progressInfo, setProgressInfo } = useModel();
+
+  // Check for document embeddings when component mounts or documents change
+  useEffect(() => {
+    const verifyEmbeddings = async () => {
+      if (documents.length === 0) {
+        setEmbeddingsVerified(false);
+        return;
+      }
+      
+      try {
+        const { verifyEmbeddings } = await import('../services/vectorStore');
+        const verification = verifyEmbeddings(undefined, projectId);
+        
+        console.log(`Chat embeddings verification for project ${projectId}:`, verification);
+        setEmbeddingsVerified(verification.exists);
+        
+        if (!verification.exists) {
+          setError('Warning: No document embeddings found. Chat may not work properly. Try refreshing the page or re-uploading the documents.');
+        } else {
+          setError(null);
+        }
+      } catch (error) {
+        console.error('Error verifying embeddings:', error);
+        setEmbeddingsVerified(false);
+      }
+    };
+    
+    verifyEmbeddings();
+  }, [documents, projectId]);
+
+  // Function to manually reinitialize the vector store
+  const handleReinitializeVectorStore = async () => {
+    setError('Reinitializing vector store...');
+    try {
+      const { initializeVectorStore } = await import('../services/vectorStore');
+      await initializeVectorStore();
+      
+      // Re-verify embeddings
+      const { verifyEmbeddings } = await import('../services/vectorStore');
+      const verification = verifyEmbeddings(undefined, projectId);
+      
+      console.log(`Re-verification after initialization:`, verification);
+      setEmbeddingsVerified(verification.exists);
+      
+      if (!verification.exists) {
+        setError('Still no document embeddings found. Please try re-uploading your documents.');
+      } else {
+        setError(null);
+      }
+    } catch (error) {
+      console.error('Error reinitializing vector store:', error);
+      setError('Failed to reinitialize the vector store. Please refresh the page.');
+    }
+  };
 
   // Add event listener for thinking events
   useEffect(() => {
@@ -343,6 +398,25 @@ const Chat: React.FC<ChatProps> = ({ documents, projectId, chatId, chatSession }
     });
   };
 
+  // Add to the render method, near where you display errors
+  const renderErrorWithRefreshButton = () => {
+    if (!error) return null;
+    
+    return (
+      <div className="chat-error">
+        <p>{error}</p>
+        {!embeddingsVerified && (
+          <button 
+            className="refresh-button"
+            onClick={handleReinitializeVectorStore}
+          >
+            Reinitialize Vector Store
+          </button>
+        )}
+      </div>
+    );
+  };
+
   return (
     <div className="chat">
       <div className="chat-header">
@@ -441,7 +515,7 @@ const Chat: React.FC<ChatProps> = ({ documents, projectId, chatId, chatSession }
         </button>
       </form>
 
-      {error && <div className="error-message">{error}</div>}
+      {renderErrorWithRefreshButton()}
       
       {messages.some(m => m.content.includes("I couldn't find any relevant information")) && (
         <div className="no-results-help">

@@ -1,5 +1,5 @@
 import { generateEmbedding } from './embeddingService';
-import { queryEmbeddings, getDocumentCount } from './vectorStore';
+import { queryEmbeddings, getDocumentCount, verifyEmbeddings } from './vectorStore';
 import { generateResponse } from './llmService';
 import { ModelInfo } from './modelPersistenceService';
 
@@ -40,6 +40,14 @@ export const queryDocuments = async (
       progressCallback('retrieval', 20);
     }
     
+    // Verify embeddings exist before querying
+    const verificationResult = verifyEmbeddings(undefined, projectId);
+    console.log(`Embedding verification result:`, verificationResult);
+    
+    if (!verificationResult.exists) {
+      return `No document embeddings were found for this project. Please make sure your documents have been processed correctly. If you've just uploaded documents, please try refreshing the page.`;
+    }
+    
     // 2. Retrieve similar chunks from the vector database
     const similarChunks = await queryEmbeddings(queryEmbedding, 5, projectId);
     
@@ -48,15 +56,24 @@ export const queryDocuments = async (
     // If no chunks found, try with a larger number of results or lower threshold
     let alternateResponse = '';
     if (similarChunks.length === 0) {
-      // Get a count of all embeddings for this project to determine if any exist
-      const count = await getDocumentCount(projectId);
+      // Try again with a larger limit
+      console.log('No results found with default limit, trying with larger limit...');
+      const moreSimilarChunks = await queryEmbeddings(queryEmbedding, 10, projectId);
       
-      if (count > 0) {
-        // Some documents exist but no good matches were found
-        alternateResponse = `I couldn't find any relevant information in the documents to answer your question.`;
+      if (moreSimilarChunks.length > 0) {
+        console.log(`Found ${moreSimilarChunks.length} chunks with increased limit`);
+        similarChunks.push(...moreSimilarChunks);
       } else {
-        // No documents have been properly indexed
-        return `No document embeddings were found for this project. Please make sure your documents have been processed correctly.`;
+        // Get a count of all embeddings for this project to determine if any exist
+        const count = await getDocumentCount(projectId);
+        
+        if (count > 0) {
+          // Some documents exist but no good matches were found
+          alternateResponse = `I couldn't find any relevant information in the documents to answer your question.`;
+        } else {
+          // No documents have been properly indexed
+          return `No document embeddings were found for this project. Please make sure your documents have been processed correctly.`;
+        }
       }
     }
     
@@ -95,7 +112,17 @@ export const queryDocuments = async (
     return response;
   } catch (error) {
     console.error('Error in queryDocuments:', error);
-    throw error;
+    let errorMessage = 'An unknown error occurred';
+    
+    if (error instanceof Error) {
+      errorMessage = error.message;
+    } else if (typeof error === 'string') {
+      errorMessage = error;
+    } else if (error && typeof error === 'object' && 'message' in error) {
+      errorMessage = String(error.message);
+    }
+    
+    return `An error occurred while processing your question: ${errorMessage}. Please try again or check the console for more details.`;
   }
 };
 

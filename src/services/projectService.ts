@@ -187,13 +187,24 @@ export const deleteProject = (projectId: string): boolean => {
  */
 export const addDocumentToProject = (projectId: string, document: DocumentInfo): boolean => {
   const project = getProjectById(projectId);
-  if (!project) return false;
+  if (!project) {
+    console.error(`Project ${projectId} not found when adding document ${document.id}`);
+    return false;
+  }
 
   if (!documents[projectId]) {
     documents[projectId] = [];
   }
 
-  documents[projectId].push(document);
+  // Check if document already exists to avoid duplicates
+  const existingDocIndex = documents[projectId].findIndex(doc => doc.id === document.id);
+  if (existingDocIndex >= 0) {
+    console.log(`Document ${document.id} already exists in project ${projectId}, updating instead of adding`);
+    documents[projectId][existingDocIndex] = document;
+  } else {
+    documents[projectId].push(document);
+    console.log(`Added document ${document.id} to project ${projectId}`);
+  }
   
   // Update project's updatedAt timestamp
   updateProject(projectId, {});
@@ -223,32 +234,47 @@ export const getProjectDocuments = (
 };
 
 /**
- * Delete a document from a project
+ * Delete document from a project
  */
-export const deleteDocumentFromProject = (projectId: string, documentId: string): boolean => {
-  console.log(`Deleting document ${documentId} from project ${projectId}`);
-  
-  if (!documents[projectId]) {
-    console.error(`Project ${projectId} not found or has no documents`);
-    return false;
+export const deleteDocumentFromProject = async (projectId: string, documentId: string): Promise<boolean> => {
+  const project = getProjectById(projectId);
+  if (!project) {
+    console.error(`Project ${projectId} not found when deleting document ${documentId}`);
+    return Promise.resolve(false);
   }
   
-  const initialLength = documents[projectId].length;
-  console.log(`Project has ${initialLength} documents before deletion`);
+  if (!documents[projectId]) {
+    console.error(`No documents found for project ${projectId}`);
+    return Promise.resolve(false);
+  }
   
-  documents[projectId] = documents[projectId].filter(doc => doc.id !== documentId);
+  // Find document in project
+  const documentIndex = documents[projectId].findIndex(doc => doc.id === documentId);
+  if (documentIndex === -1) {
+    console.error(`Document ${documentId} not found in project ${projectId}`);
+    return Promise.resolve(false);
+  }
   
-  if (documents[projectId].length < initialLength) {
+  try {
+    // First delete from vector store to ensure embeddings are removed
+    const { deleteDocumentChunks } = await import('./vectorStore');
+    const deletedCount = deleteDocumentChunks(documentId);
+    console.log(`Deleted ${deletedCount} embeddings for document ${documentId}`);
+    
+    // Then remove from document management
+    const documentToDelete = documents[projectId][documentIndex];
+    documents[projectId].splice(documentIndex, 1);
+    
     // Update project's updatedAt timestamp
     updateProject(projectId, {});
     
-    console.log(`Document ${documentId} successfully deleted from project ${projectId}`);
     saveToLocalStorage();
-    return true;
+    
+    return Promise.resolve(true);
+  } catch (error) {
+    console.error(`Failed to delete document ${documentId} from project ${projectId}:`, error);
+    return Promise.resolve(false);
   }
-  
-  console.error(`Document ${documentId} not found in project ${projectId}`);
-  return false;
 };
 
 // Chat Session Management
