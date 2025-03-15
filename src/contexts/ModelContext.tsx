@@ -31,7 +31,7 @@ export const MODEL_OPTIONS: ModelOption[] = [
     id: 'onnx-community/Pleias-Nano',
     name: 'Pleias-Nano (CPU)',
     size: '1.2B',
-    quality: 'Slow',
+    quality: 'Great',
     speed: 'Very Slow',
   }
 ];
