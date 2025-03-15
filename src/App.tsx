@@ -46,7 +46,7 @@ function App() {
 
   // Sidebar collapse state
   const [projectSidebarCollapsed, setProjectSidebarCollapsed] = useState(false);
-  const [chatSidebarCollapsed, setChatSidebarCollapsed] = useState(false);
+  const [chatSidebarCollapsed, setChatSidebarCollapsed] = useState(window.innerWidth <= 768);
 
   // Track window width for responsive design
   const [windowWidth, setWindowWidth] = useState(window.innerWidth);
@@ -56,9 +56,10 @@ function App() {
     const handleResize = () => {
       setWindowWidth(window.innerWidth);
       
-      // Auto-collapse project sidebar on mobile
+      // Auto-collapse sidebars on mobile
       if (window.innerWidth <= 768) {
         setProjectSidebarCollapsed(true);
+        setChatSidebarCollapsed(true);
       }
     };
 
@@ -367,19 +368,34 @@ function App() {
 
         <div className="app-content-wrapper">
           <nav className="app-tabs">
-            <button 
-              className={activeTab === 'upload' ? 'active' : ''} 
-              onClick={() => setActiveTab('upload')}
-            >
-              Upload Documents
-            </button>
-            <button 
-              className={activeTab === 'chat' ? 'active' : ''} 
-              onClick={() => setActiveTab('chat')}
-              disabled={totalDocuments === 0}
-            >
-              Chat
-            </button>
+            <div className="app-tabs-buttons">
+              <button 
+                className={activeTab === 'upload' ? 'active' : ''} 
+                onClick={() => setActiveTab('upload')}
+              >
+                Upload Documents
+              </button>
+              <button 
+                className={activeTab === 'chat' ? 'active' : ''} 
+                onClick={() => setActiveTab('chat')}
+                disabled={totalDocuments === 0}
+              >
+                Chat
+              </button>
+            </div>
+            
+            {/* Show chat sidebar toggle only when in chat tab */}
+            {activeTab === 'chat' && (
+              <div className="app-tabs-actions">
+                <button 
+                  className="chat-sidebar-toggle" 
+                  onClick={toggleChatSidebar}
+                  aria-label={chatSidebarCollapsed ? "Show chats" : "Hide chats"}
+                >
+                  {chatSidebarCollapsed ? "+" : "−"}
+                </button>
+              </div>
+            )}
           </nav>
 
           <main className="app-content">
@@ -398,13 +414,6 @@ function App() {
             ) : (
               <div className="chat-interface">
                 <div className={`chat-sidebar ${chatSidebarCollapsed ? 'collapsed' : ''}`}>
-                  <button 
-                    className="chat-sidebar-toggle" 
-                    onClick={toggleChatSidebar}
-                    aria-label={chatSidebarCollapsed ? "Show chats" : "Hide chats"}
-                  >
-                    {chatSidebarCollapsed ? "+" : "−"}
-                  </button>
                   <ChatList 
                     chats={chatSessions}
                     selectedChatId={selectedChatId}

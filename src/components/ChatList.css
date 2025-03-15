@@ -1,17 +1,13 @@
 .chat-list {
   background-color: rgba(255, 255, 255, 0.05);
   border-radius: 0.5rem;
-  padding: 1.5rem;
-  padding-left: 40px; /* Space for the toggle button */
-  margin-bottom: 0;
+  padding: 1rem;
   width: 100%;
-  height: auto; /* Change from 100% to auto */
-  max-height: calc(100vh - 180px); /* Limit height to viewport height minus space for header/footer/tabs */
+  height: 100%;
   display: flex;
   flex-direction: column;
-  overflow: hidden; /* Change from auto to hidden so child can scroll */
-  transition: opacity var(--transition-speed) ease;
-  opacity: 1;
+  overflow: hidden;
+  transition: all var(--transition-speed) ease;
 }
 
 .chat-list-header {
@@ -19,12 +15,25 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 1.5rem;
+  margin-bottom: 1rem;
 }
 
 .chat-list-header h3 {
   margin: 0;
   font-size: 1.25rem;
+}
+
+.chat-list-scroll {
+  flex: 1;
+  overflow-y: auto;
+  margin-right: -0.5rem;
+  padding-right: 0.5rem;
+}
+
+.chat-list-scroll ul {
+  list-style-type: none;
+  margin: 0;
+  padding: 0;
 }
 
 .create-chat-button {
@@ -98,19 +107,6 @@
 .create-button:disabled, .save-button:disabled {
   background-color: #9ca3af;
   cursor: not-allowed;
-}
-
-.chats-container {
-  flex: 1;
-  overflow-y: auto; /* Enable vertical scrolling */
-  min-height: 0; /* Important for flex child to enable scrolling */
-  margin-bottom: 0.5rem;
-}
-
-.chats-container ul {
-  list-style-type: none;
-  margin: 0;
-  padding: 0;
 }
 
 .chat-item {
@@ -247,43 +243,42 @@
 
 /* Collapsed chat sidebar styles */
 .chat-sidebar.collapsed .chat-list {
+  transform: translateX(-100%);
   opacity: 0;
-  pointer-events: none;
 }
 
 @media (max-width: 768px) {
   .chat-list {
-    padding: 1rem;
-    padding-top: 40px; /* Space for toggle button */
-    width: 100%;
+    padding: 0.75rem;
+    height: 100%;
     border-radius: 0.25rem;
   }
   
-  .chat-sidebar.collapsed .chat-list {
-    opacity: 0;
+  .chat-list-header {
+    margin-bottom: 0.75rem;
   }
   
   .chat-list-header h3 {
-    font-size: 1.2rem;
+    font-size: 1.125rem;
   }
   
   .create-chat-button {
-    padding: 0.5rem 0.75rem;
+    padding: 0.375rem 0.75rem;
+    font-size: 0.875rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .chat-list {
+    padding: 0.5rem;
   }
   
-  .chat-item {
-    margin-bottom: 0.5rem;
+  .chat-list-header h3 {
+    font-size: 1rem;
   }
   
-  .chat-name {
-    font-size: 0.9rem;
-  }
-  
-  .chat-date {
-    font-size: 0.75rem;
-  }
-  
-  .chat-actions button {
-    padding: 0.3rem;
+  .create-chat-button {
+    padding: 0.25rem 0.5rem;
+    font-size: 0.8125rem;
   }
 } 

@@ -127,6 +127,19 @@ html {
   display: flex;
   gap: 0.5rem;
   flex-shrink: 0; /* Prevent tabs from shrinking */
+  align-items: center;
+  justify-content: space-between;
+}
+
+.app-tabs-buttons {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.app-tabs-actions {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
 }
 
 .app-tabs button {
@@ -204,31 +217,25 @@ html {
 }
 
 .chat-sidebar.collapsed {
-  width: 40px; /* Keep enough width for the button to be visible */
+  width: 0; /* Changed from 40px to 0 to completely hide it */
   overflow: hidden;
 }
 
+/* Move chat sidebar toggle to tab bar */
 .chat-sidebar-toggle {
-  position: absolute;
-  top: 10px;
-  right: -40px; /* Position outside by default */
-  width: 40px;
-  height: 40px;
+  width: 32px;
+  height: 32px;
   background-color: var(--app-accent-color);
   border: none;
-  border-radius: 0 4px 4px 0;
+  border-radius: 4px;
   color: white;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 10;
-}
-
-.chat-sidebar.collapsed .chat-sidebar-toggle {
-  right: auto; /* Reset right positioning */
-  left: 0; /* Position at the left edge when collapsed */
-  border-radius: 4px;
+  font-size: 1rem;
+  transition: background-color 0.2s;
 }
 
 .chat-sidebar-toggle:hover {
@@ -300,11 +307,11 @@ html {
   }
   
   .app-content-wrapper {
-    padding-top: 60px; /* Space for the fixed toggle button */
+    padding-top: 0; /* Changed from 60px to 0 as the toggle button is now in the tab bar */
   }
   
   .app-tabs {
-    padding-left: 1rem;
+    padding: 0.25rem 0.5rem;
   }
   
   /* Mobile overlay */
@@ -328,40 +335,27 @@ html {
     flex-direction: column;
     min-height: 0;
     height: 100%;
+    gap: 0.5rem; /* Reduce gap on mobile */
   }
   
   .chat-sidebar {
     width: 100%;
     max-height: 40%; /* Use percentage of available space */
-    margin-bottom: 1rem;
+    margin-bottom: 0.5rem; /* Reduced from 1rem */
     flex-shrink: 0;
   }
   
   .chat-sidebar.collapsed {
-    max-height: 40px; /* Keep enough height for the button */
-    margin-bottom: 1rem;
-    width: 100%;
+    width: 0;
+    max-height: 0;
+    margin-bottom: 0;
     overflow: hidden;
-  }
-  
-  .chat-sidebar-toggle {
-    top: 0;
-    left: 50%; /* Center the toggle in mobile view */
-    right: auto;
-    transform: translateX(-50%);
-    border-radius: 0 0 4px 4px;
-  }
-  
-  .chat-sidebar.collapsed .chat-sidebar-toggle {
-    top: 0;
-    left: 50%;
-    transform: translateX(-50%);
-    border-radius: 0 0 4px 4px;
   }
   
   .chat-main {
     flex: 1;
     min-height: 0;
+    border-radius: 0.25rem;
   }
 }
 

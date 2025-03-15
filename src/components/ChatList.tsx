@@ -95,7 +95,7 @@ const ChatList: React.FC<ChatListProps> = ({
         </div>
       )}
 
-      <div className="chats-container">
+      <div className="chat-list-scroll">
         {chats.length === 0 ? (
           <div className="no-chats">
             <p>No chat sessions yet. Create a new chat to start a conversation.</p>
