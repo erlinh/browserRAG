@@ -18,10 +18,18 @@ jobs:
         node-version: '18'
 
     - name: Install dependencies
-      run: npm install
+      run: npm ci
 
     - name: Build project
       run: npm run build
+
+    - name: Clean up unnecessary files
+      run: |
+        cd dist
+        rm -rf *.map
+        # Remove any other unnecessary files if needed
+        # Find large files for debugging purposes
+        find . -type f -size +1M | sort -n -r | head -10
 
     - name: Deploy to Azure Static Web Apps
       uses: Azure/static-web-apps-deploy@v1

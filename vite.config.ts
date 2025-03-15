@@ -31,6 +31,25 @@ export default defineConfig({
   ],
   build: {
     target: 'esnext',
+    sourcemap: false, // Disable sourcemaps to reduce size
+    minify: 'terser',
+    terserOptions: {
+      compress: {
+        drop_console: true,
+        drop_debugger: true,
+      },
+    },
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          react: ['react', 'react-dom', 'react-router-dom'],
+          ui: ['@mui/material', '@mui/icons-material', '@emotion/react', '@emotion/styled'],
+          pdf: ['pdfjs-dist'],
+          vendor: ['uuid', 'dexie', 'localforage', 'langchain'],
+        },
+      },
+    },
+    chunkSizeWarningLimit: 1000, // Increase the warning limit to avoid warnings for smaller chunks
   },
   optimizeDeps: {
     esbuildOptions: {
@@ -38,10 +57,6 @@ export default defineConfig({
     },
   },
   server: {
-    port: 3000,
-    allowedHosts: [
-      '69c4-130-41-215-103.ngrok-free.app',
-      '.ngrok-free.app', // To allow any future ngrok URLs without needing to update config
-    ]
+    port: 3000
   }
 }); 
