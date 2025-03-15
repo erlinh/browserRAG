@@ -15,7 +15,7 @@ jobs:
     - name: Set up Node.js
       uses: actions/setup-node@v2
       with:
-        node-version: '22'
+        node-version: '18'
 
     - name: Install dependencies
       run: npm install
@@ -29,4 +29,6 @@ jobs:
         azure_static_web_apps_api_token: ${{ secrets.DEPLOYMENT_TOKEN }}
         action: 'upload'
         app_location: '/'
+        api_location: ''
         output_location: 'dist'
+        skip_app_build: true
