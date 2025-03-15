@@ -39,6 +39,19 @@ const Chat: React.FC<ChatProps> = ({ documents, projectId, chatId, chatSession }
   // Get model context
   const { selectedModel, progressInfo, setProgressInfo } = useModel();
 
+  // Modal state
+  const [showHeaderModal, setShowHeaderModal] = useState(false);
+  
+  // Ref for the modal content
+  const modalContentRef = useRef<HTMLDivElement>(null);
+  
+  // Handle modal backdrop click to close the modal
+  const handleBackdropClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (modalContentRef.current && !modalContentRef.current.contains(e.target as Node)) {
+      setShowHeaderModal(false);
+    }
+  };
+
   // Check for document embeddings when component mounts or documents change
   useEffect(() => {
     const verifyEmbeddings = async () => {
@@ -419,10 +432,62 @@ const Chat: React.FC<ChatProps> = ({ documents, projectId, chatId, chatSession }
 
   return (
     <div className="chat">
+      {/* Enhanced Header with Model Info */}
       <div className="chat-header">
         <h2>{chatSession?.name || 'Chat'}</h2>
-        <ModelSelector />
+        <button 
+          className="chat-header-model-button" 
+          onClick={() => setShowHeaderModal(true)}
+          aria-label="Model Settings"
+          title="Click to change model settings"
+        >
+          <span className="model-name">{selectedModel.name}</span>
+          <span className="model-size">{selectedModel.size}</span>
+          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="6 9 12 15 18 9"></polyline>
+          </svg>
+        </button>
       </div>
+      
+      {/* Header Modal with updated click handler */}
+      {showHeaderModal && (
+        <div 
+          className={`header-modal ${showHeaderModal ? 'open' : ''}`}
+          onClick={handleBackdropClick}
+        >
+          <div 
+            className="header-modal-content"
+            ref={modalContentRef}
+          >
+            <button 
+              className="header-modal-close" 
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowHeaderModal(false);
+              }}
+              aria-label="Close modal"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="18" y1="6" x2="6" y2="18"></line>
+                <line x1="6" y1="6" x2="18" y2="18"></line>
+              </svg>
+            </button>
+            <h3 className="header-modal-title">Model Settings for {chatSession?.name || 'Chat'}</h3>
+            <div className="header-modal-body">
+              <div className="model-selector-container">
+                <label>Model:</label>
+                <ModelSelector />
+              </div>
+              <div className="chat-info">
+                <p>Chat Session: {chatSession?.name || 'Unnamed'}</p>
+                <p>Project ID: {projectId}</p>
+                <p>Documents: {documents.length}</p>
+                <p>Messages: {messages.length}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
       
       <div className="messages-container">
         <div className="messages">

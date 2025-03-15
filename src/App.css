@@ -7,9 +7,9 @@
   --sidebar-width: 280px;
   --chat-sidebar-width: 280px;
   --transition-speed: 0.3s;
-  --header-height: 84px; /* Approximated from padding: 1.5rem 1rem */
-  --footer-height: 64px; /* Approximated from padding: 1rem */
-  --tabs-height: 48px; /* Approximated from tab buttons */
+  --header-height: 60px; /* Reduced from 84px */
+  --footer-height: 40px; /* Reduced from 64px */
+  --tabs-height: 40px; /* Reduced from 48px */
 }
 
 body {
@@ -40,7 +40,7 @@ html {
 }
 
 .app-header {
-  padding: 1.5rem 1rem;
+  padding: 0.75rem 1rem; /* Reduced from 1.5rem 1rem */
   text-align: center;
   background-color: var(--app-header-bg);
   border-bottom: 1px solid var(--app-border-color);
@@ -49,13 +49,14 @@ html {
 
 .app-header h1 {
   margin: 0;
-  font-size: 2rem;
+  font-size: 1.75rem; /* Reduced from 2rem */
   color: var(--app-text-color);
 }
 
 .app-header p {
-  margin: 0.5rem 0 0;
+  margin: 0.25rem 0 0; /* Reduced from 0.5rem */
   color: rgba(255, 255, 255, 0.7);
+  font-size: 0.875rem;
 }
 
 /* Main layout */
@@ -120,7 +121,7 @@ html {
 }
 
 .app-tabs {
-  padding: 0.5rem 1rem;
+  padding: 0.25rem 0.75rem; /* Reduced from 0.5rem 1rem */
   background-color: var(--app-header-bg);
   border-bottom: 1px solid var(--app-border-color);
   display: flex;
@@ -129,13 +130,13 @@ html {
 }
 
 .app-tabs button {
-  padding: 0.5rem 1rem;
+  padding: 0.375rem 0.75rem; /* Reduced from 0.5rem 1rem */
   background-color: rgba(255, 255, 255, 0.1);
   border: none;
   border-radius: 0.25rem;
   color: var(--app-text-color);
   cursor: pointer;
-  font-size: 0.875rem;
+  font-size: 0.8125rem; /* Reduced from 0.875rem */
   transition: background-color 0.2s;
 }
 
@@ -165,8 +166,8 @@ html {
 
 .app-footer {
   text-align: center;
-  padding: 1rem;
-  font-size: 0.875rem;
+  padding: 0.5rem; /* Reduced from 1rem */
+  font-size: 0.8125rem; /* Reduced from 0.875rem */
   color: rgba(255, 255, 255, 0.5);
   border-top: 1px solid var(--app-border-color);
   background-color: var(--app-header-bg);
@@ -175,7 +176,7 @@ html {
 
 .app-footer small {
   display: block;
-  margin-top: 0.5rem;
+  margin-top: 0.25rem; /* Reduced from 0.5rem */
   color: rgba(255, 255, 255, 0.4);
 }
 
@@ -366,20 +367,26 @@ html {
 
 @media (max-width: 480px) {
   .app-tabs button {
-    padding: 0.5rem;
-    font-size: 0.8125rem;
+    padding: 0.25rem 0.5rem; /* Reduced from 0.5rem */
+    font-size: 0.75rem; /* Reduced from 0.8125rem */
   }
   
   .app-header h1 {
-    font-size: 1.75rem;
+    font-size: 1.5rem; /* Reduced from 1.75rem */
   }
   
   .app-header p {
-    font-size: 0.875rem;
+    font-size: 0.8125rem; /* Reduced from 0.875rem */
+    margin-top: 0.125rem; /* Further reduce top margin */
   }
   
   .app-content {
-    padding: 0.75rem;
+    padding: 0.5rem; /* Reduced from 0.75rem */
+  }
+  
+  .app-footer {
+    padding: 0.375rem; /* Reduced from 0.5rem */
+    font-size: 0.75rem; /* Reduced from 0.8125rem */
   }
 }
 

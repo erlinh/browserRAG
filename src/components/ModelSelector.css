@@ -8,6 +8,29 @@
   border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
+/* Styles for the ModelSelector when used in the header modal */
+.header-modal-body .model-selector-container {
+  padding: 8px;
+  margin-bottom: 0;
+  background-color: transparent;
+  border: none;
+}
+
+.header-modal-body .model-select {
+  margin-bottom: 8px;
+}
+
+.header-modal-body .model-info {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+}
+
+.header-modal-body .webgpu-toggle {
+  grid-column: 1 / -1;
+  margin-top: 8px;
+}
+
 .model-label {
   font-size: 14px;
   font-weight: 500;
