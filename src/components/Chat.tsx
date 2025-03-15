@@ -186,9 +186,11 @@ const Chat: React.FC<ChatProps> = ({ documents, projectId, chatId, chatSession }
     }
   }, [chatSession, documents.length, projectId, chatId]);
 
-  // Scroll to bottom whenever messages change
+  // Scroll to bottom when messages change
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    if (messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
   }, [messages]);
 
   // Reset progress info when component unmounts
