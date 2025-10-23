@@ -42,10 +42,10 @@ export default defineConfig({
     rollupOptions: {
       output: {
         manualChunks: {
-          react: ['react', 'react-dom', 'react-router-dom'],
-          ui: ['@mui/material', '@mui/icons-material', '@emotion/react', '@emotion/styled'],
+          react: ['react', 'react-dom'],
           pdf: ['pdfjs-dist'],
-          vendor: ['uuid', 'dexie', 'localforage', 'langchain'],
+          transformers: ['@huggingface/transformers'],
+          vendor: ['uuid', 'papaparse'],
         },
       },
     },
