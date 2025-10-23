@@ -1,6 +1,7 @@
 import { useState, useRef, ChangeEvent } from 'react';
 import { processPdfDocument, processCsvDocument } from '../services/documentService';
 import { DocumentInfo } from '../services/documentManagementService';
+import { useProvider } from '../contexts/ProviderContext';
 import './DocumentUpload.css';
 
 interface DocumentUploadProps {
@@ -34,6 +35,9 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
   const [totalChunks, setTotalChunks] = useState<number>(0);
   const [processingDetails, setProcessingDetails] = useState<string[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  
+  // Get provider context
+  const { provider, config } = useProvider();
 
   const handleFileChange = async (e: ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
@@ -64,19 +68,26 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
         
         if (fileType === 'pdf') {
           setProcessingStatus('Processing PDF document...');
-          const documentInfo = await processPdfDocument(projectId, file, (progress: number) => {
-            // Map processing progress from 0-100 to 50-100 for the total progress
-            setUploadProgress(50 + Math.round(progress * 0.5));
-            
-            // Add embedding details at key points
-            if (progress === 25) {
-              setProcessingDetails(prev => [...prev, `Extracting text from PDF pages...`]);
-            } else if (progress === 50) {
-              setProcessingDetails(prev => [...prev, `PDF text extracted, generating embeddings...`]);
-            } else if (progress === 75) {
-              setProcessingDetails(prev => [...prev, `Storing document embeddings in vector database...`]);
-            }
-          });
+          const embeddingModelId = provider === 'lmstudio' ? config.selectedLMStudioEmbeddingModel : undefined;
+          const documentInfo = await processPdfDocument(
+            projectId, 
+            file, 
+            (progress: number) => {
+              // Map processing progress from 0-100 to 50-100 for the total progress
+              setUploadProgress(50 + Math.round(progress * 0.5));
+              
+              // Add embedding details at key points
+              if (progress === 25) {
+                setProcessingDetails(prev => [...prev, `Extracting text from PDF pages...`]);
+              } else if (progress === 50) {
+                setProcessingDetails(prev => [...prev, `PDF text extracted, generating embeddings...`]);
+              } else if (progress === 75) {
+                setProcessingDetails(prev => [...prev, `Storing document embeddings in vector database...`]);
+              }
+            },
+            provider,
+            embeddingModelId
+          );
           
           // Verify embeddings immediately after processing
           try {
@@ -105,7 +116,11 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
           const estimatedChunks = Math.ceil(file.size / 50000); // Rough estimate based on file size
           setTotalChunks(estimatedChunks > 0 ? estimatedChunks : 1);
           
-          const documentInfo = await processCsvDocument(projectId, file, (progress: number, chunkInfo?: { current: number, total: number }) => {
+          const embeddingModelId = provider === 'lmstudio' ? config.selectedLMStudioEmbeddingModel : undefined;
+          const documentInfo = await processCsvDocument(
+            projectId, 
+            file, 
+            (progress: number, chunkInfo?: { current: number, total: number }) => {
             // If we have chunk info, update the status message
             if (chunkInfo) {
               setCurrentChunk(chunkInfo.current);
@@ -126,7 +141,10 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
             
             // Calculate overall progress, balancing between parsing (50%) and embedding (50%)
             setUploadProgress(50 + Math.round(progress * 0.5));
-          });
+          },
+          provider,
+          embeddingModelId
+          );
           
           // Verify embeddings immediately after processing
           try {

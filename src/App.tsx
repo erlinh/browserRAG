@@ -3,6 +3,7 @@ import DocumentUpload from './components/DocumentUpload';
 import Chat from './components/Chat';
 import ProjectSelector from './components/ProjectSelector';
 import ChatList from './components/ChatList';
+import ModelSelector from './components/ModelSelector';
 import { initializeVectorStore, deleteDocumentChunks } from './services/vectorStore';
 import { useModel } from './contexts/ModelContext';
 import { 
@@ -52,6 +53,9 @@ function App() {
 
   // Track window width for responsive design
   const [windowWidth, setWindowWidth] = useState(window.innerWidth);
+
+  // Settings modal state
+  const [showSettingsModal, setShowSettingsModal] = useState(false);
 
   // Effect to handle window resizing
   useEffect(() => {
@@ -410,9 +414,47 @@ Please provide a comprehensive answer to the question based ONLY on the informat
   return (
     <div className="app-container">
       <header className="app-header">
-        <h1>BrowserRAG</h1>
-        <p>Chat with your documents entirely in your browser</p>
+        <div className="header-content">
+          <div className="header-title">
+            <h1>BrowserRAG</h1>
+            <p>Chat with your documents entirely in your browser</p>
+          </div>
+          <button 
+            className="settings-button"
+            onClick={() => setShowSettingsModal(true)}
+            aria-label="Settings"
+            title="Provider & Model Settings"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="12" r="3"></circle>
+              <path d="M12 1v6m0 6v6m0-12a9 9 0 0 1 9 9 9 9 0 0 1-9 9 9 9 0 0 1-9-9 9 9 0 0 1 9-9z"></path>
+              <path d="M12 1v2m0 18v2M4.22 4.22l1.42 1.42m12.72 12.72 1.42 1.42M1 12h2m18 0h2M4.22 19.78l1.42-1.42m12.72-12.72 1.42-1.42"></path>
+            </svg>
+            Settings
+          </button>
+        </div>
       </header>
+
+      {/* Settings Modal */}
+      {showSettingsModal && (
+        <div className="settings-modal-overlay" onClick={() => setShowSettingsModal(false)}>
+          <div className="settings-modal-content" onClick={(e) => e.stopPropagation()}>
+            <div className="settings-modal-header">
+              <h2>Provider & Model Settings</h2>
+              <button 
+                className="settings-modal-close"
+                onClick={() => setShowSettingsModal(false)}
+                aria-label="Close"
+              >
+                ×
+              </button>
+            </div>
+            <div className="settings-modal-body">
+              <ModelSelector />
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Mobile overlay for sidebar */}
       {!projectSidebarCollapsed && windowWidth <= 768 && (

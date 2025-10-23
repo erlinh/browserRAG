@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect, useLayoutEffect } from 'react';
 import { queryDocuments, ProgressCallback } from '../services/ragService';
 import { useModel } from '../contexts/ModelContext';
+import { useProvider } from '../contexts/ProviderContext';
 import { ChatSession, ChatMessage as StoredChatMessage, addMessageToChatSession } from '../services/projectService';
 import ModelSelector from './ModelSelector';
 import ProgressBar, { ProgressInfo } from './ProgressBar';
@@ -51,6 +52,9 @@ const Chat: React.FC<ChatProps> = ({ documents, projectId, chatId, chatSession }
   
   // Get model context
   const { selectedModel, progressInfo, setProgressInfo } = useModel();
+  
+  // Get provider context
+  const { provider, config } = useProvider();
 
   // Modal state
   const [showHeaderModal, setShowHeaderModal] = useState(false);
@@ -356,6 +360,21 @@ const Chat: React.FC<ChatProps> = ({ documents, projectId, chatId, chatSession }
         });
       };
 
+      // Determine which model IDs to use based on provider
+      let effectiveModelId = selectedModel.id;
+      let effectiveEmbeddingModelId: string | undefined = undefined;
+      
+      if (provider === 'lmstudio') {
+        effectiveModelId = config.selectedLMStudioModel || 'local-model';
+        effectiveEmbeddingModelId = config.selectedLMStudioEmbeddingModel;
+      } else if (provider === 'ollama') {
+        effectiveModelId = config.selectedOllamaModel || 'llama2';
+        effectiveEmbeddingModelId = config.selectedOllamaEmbeddingModel;
+      }
+
+      // Update model info with the effective model ID
+      modelInfo.id = effectiveModelId;
+
       // Query documents with streaming
       const response = await queryDocuments(
         question,
@@ -363,7 +382,9 @@ const Chat: React.FC<ChatProps> = ({ documents, projectId, chatId, chatSession }
         modelInfo,
         progressCallback,
         projectId,
-        streamCallback  // Add streaming callback
+        streamCallback,
+        provider,
+        effectiveEmbeddingModelId
       );
 
       // Update the message to indicate streaming is complete
@@ -474,6 +495,33 @@ const Chat: React.FC<ChatProps> = ({ documents, projectId, chatId, chatSession }
     );
   };
 
+  // Get display name and info based on provider
+  const getModelDisplayInfo = () => {
+    if (provider === 'lmstudio') {
+      const modelName = config.selectedLMStudioModel || 'Not selected';
+      return {
+        name: modelName.length > 30 ? modelName.substring(0, 30) + '...' : modelName,
+        provider: 'LMStudio',
+        size: ''
+      };
+    } else if (provider === 'ollama') {
+      const modelName = config.selectedOllamaModel || 'Not selected';
+      return {
+        name: modelName.length > 30 ? modelName.substring(0, 30) + '...' : modelName,
+        provider: 'Ollama',
+        size: ''
+      };
+    } else {
+      return {
+        name: selectedModel.name,
+        provider: 'Browser',
+        size: selectedModel.size
+      };
+    }
+  };
+
+  const modelDisplay = getModelDisplayInfo();
+
   return (
     <div className="chat">
       {/* Enhanced Header with Model Info */}
@@ -485,8 +533,9 @@ const Chat: React.FC<ChatProps> = ({ documents, projectId, chatId, chatSession }
           aria-label="Model Settings"
           title="Click to change model settings"
         >
-          <span className="model-name">{selectedModel.name}</span>
-          <span className="model-size">{selectedModel.size}</span>
+          <span className="model-name">{modelDisplay.name}</span>
+          {modelDisplay.size && <span className="model-size">{modelDisplay.size}</span>}
+          <span className="model-provider">via {modelDisplay.provider}</span>
           <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <polyline points="6 9 12 15 18 9"></polyline>
           </svg>

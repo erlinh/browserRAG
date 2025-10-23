@@ -183,4 +183,27 @@ input:checked + .toggle-slider:before {
 .toggle-switch.disabled {
   opacity: 0.6;
   pointer-events: none;
+}
+
+/* Provider active notice */
+.provider-active-notice {
+  background-color: rgba(34, 197, 94, 0.1);
+  border: 1px solid rgba(34, 197, 94, 0.3);
+  border-radius: 6px;
+  padding: 12px;
+  margin-bottom: 12px;
+}
+
+.provider-active-notice p {
+  margin: 0;
+  color: rgba(34, 197, 94, 1);
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.provider-active-notice .notice-subtext {
+  margin-top: 4px;
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 12px;
+  font-weight: 400;
 } 

@@ -1,11 +1,15 @@
 import React, { useState, useEffect } from 'react';
-import { useModel, ModelOption, MODEL_OPTIONS } from '../contexts/ModelContext';
+import { useModel, MODEL_OPTIONS } from '../contexts/ModelContext';
+import { useProvider } from '../contexts/ProviderContext';
+import ProviderSelector from './ProviderSelector';
 import './ModelSelector.css';
 
 const ModelSelector: React.FC = () => {
   const { selectedModel, setSelectedModel, progressInfo, useWebGPU, setUseWebGPU } = useModel();
+  const { provider, config, updateConfig } = useProvider();
   const [isWebGPUSupported, setIsWebGPUSupported] = useState<boolean | null>(null);
   const [showUsabilityWarning, setShowUsabilityWarning] = useState<boolean>(false);
+  const [defaultSetMessage, setDefaultSetMessage] = useState<string | null>(null);
   
   // Check for WebGPU support when component mounts
   useEffect(() => {
@@ -64,6 +68,17 @@ const ModelSelector: React.FC = () => {
     setUseWebGPU(!useWebGPU);
   };
 
+  const handleSetBrowserAsDefault = () => {
+    updateConfig({
+      defaultProvider: 'browser',
+      defaultBrowserModel: selectedModel.id,
+    });
+    setDefaultSetMessage('✓ Browser model set as default!');
+    setTimeout(() => setDefaultSetMessage(null), 3000);
+  };
+
+  const isBrowserDefault = config.defaultProvider === 'browser' && config.defaultBrowserModel === selectedModel.id;
+
   // Get appropriate WebGPU status text
   const getWebGPUStatusLabel = () => {
     if (isWebGPUSupported === null) {
@@ -79,6 +94,17 @@ const ModelSelector: React.FC = () => {
 
   return (
     <div className="model-selector-container">
+      <ProviderSelector />
+      
+      {(provider === 'lmstudio' || provider === 'ollama') && (
+        <div className="provider-active-notice">
+          <p>✓ Using {provider === 'lmstudio' ? 'LMStudio' : 'Ollama'} for model inference</p>
+          <p className="notice-subtext">Model selection is managed in the provider settings above</p>
+        </div>
+      )}
+      
+      {provider === 'browser' && (
+        <>
       <label htmlFor="model-select" className="model-label">
         LLM Model
       </label>
@@ -134,6 +160,23 @@ const ModelSelector: React.FC = () => {
           </div>
         )}
       </div>
+
+      <div className="default-button-container">
+        <button
+          onClick={handleSetBrowserAsDefault}
+          className={`default-button ${isBrowserDefault ? 'is-default' : ''}`}
+        >
+          {isBrowserDefault ? '✓ Default Browser Model' : 'Set as Default'}
+        </button>
+        {defaultSetMessage && (
+          <span className="default-info">{defaultSetMessage}</span>
+        )}
+        {isBrowserDefault && !defaultSetMessage && (
+          <span className="default-info">This will be used on startup</span>
+        )}
+      </div>
+        </>
+      )}
     </div>
   );
 };

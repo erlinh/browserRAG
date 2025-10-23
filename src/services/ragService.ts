@@ -2,6 +2,8 @@ import { generateEmbedding } from './embeddingService';
 import { queryEmbeddings, getDocumentCount, verifyEmbeddings } from './vectorStore';
 import { generateResponse } from './llmService';
 import { ModelInfo } from './modelPersistenceService';
+import { generateUnifiedResponse, generateUnifiedEmbedding } from './unifiedLLMService';
+import { ProviderType } from '../contexts/ProviderContext';
 
 // Define a type for progress callback
 export type ProgressCallback = (stage: string, progress: number) => void;
@@ -20,7 +22,9 @@ export const queryDocuments = async (
   model: ModelInfo,
   progressCallback?: ProgressCallback,
   projectId?: string,
-  streamCallback?: (token: string) => void
+  streamCallback?: (token: string) => void,
+  provider: ProviderType = 'browser',
+  embeddingModelId?: string
 ): Promise<string> => {
   try {
     // Check if we have documents
@@ -33,18 +37,22 @@ export const queryDocuments = async (
       // Create a conversational prompt
       const conversationalPrompt = constructConversationalPrompt(question);
       
-      // Generate response with the LLM
-      const response = await generateResponse(
-        conversationalPrompt, 
-        model.id,
-        (progress) => {
-          if (progressCallback) {
-            // Map the LLM progress to our progress range (60-100%)
-            const mappedProgress = 60 + (progress.progress || 0) * 0.4;
-            progressCallback(progress.stage || 'generation', mappedProgress);
-          }
-        },
-        streamCallback  // Pass the stream callback to generateResponse
+      // Generate response with the unified LLM service
+      const response = await generateUnifiedResponse(
+        conversationalPrompt,
+        {
+          provider,
+          modelId: model.id,
+          embeddingModelId,
+          progressCallback: (progress) => {
+            if (progressCallback) {
+              // Map the LLM progress to our progress range (60-100%)
+              const mappedProgress = 60 + (progress.progress || 0) * 0.4;
+              progressCallback(progress.stage || 'generation', mappedProgress);
+            }
+          },
+          streamCallback,
+        }
       );
       
       // Update progress
@@ -65,7 +73,10 @@ export const queryDocuments = async (
     }
     
     // 1. Generate embedding for the query
-    const queryEmbedding = await generateEmbedding(question);
+    const queryEmbedding = await generateUnifiedEmbedding(question, {
+      provider,
+      embeddingModelId,
+    });
     
     // Update progress
     if (progressCallback) {
@@ -128,17 +139,21 @@ export const queryDocuments = async (
     }
     
     // 4. Generate response with the LLM
-    const response = await generateResponse(
-      prompt, 
-      model.id,
-      (progress) => {
-        if (progressCallback) {
-          // Map the LLM progress to our progress range (60-100%)
-          const mappedProgress = 60 + (progress.progress || 0) * 0.4;
-          progressCallback(progress.stage || 'generation', mappedProgress);
-        }
-      },
-      streamCallback  // Pass the stream callback to generateResponse
+    const response = await generateUnifiedResponse(
+      prompt,
+      {
+        provider,
+        modelId: model.id,
+        embeddingModelId,
+        progressCallback: (progress) => {
+          if (progressCallback) {
+            // Map the LLM progress to our progress range (60-100%)
+            const mappedProgress = 60 + (progress.progress || 0) * 0.4;
+            progressCallback(progress.stage || 'generation', mappedProgress);
+          }
+        },
+        streamCallback,
+      }
     );
     
     // Update progress

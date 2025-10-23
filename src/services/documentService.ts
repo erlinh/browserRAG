@@ -2,9 +2,11 @@ import * as pdfjs from 'pdfjs-dist';
 import Papa from 'papaparse';
 import { v4 as uuidv4 } from 'uuid';
 import { generateEmbeddings } from './embeddingService';
+import { generateUnifiedEmbeddings } from './unifiedLLMService';
 import { storeEmbeddings } from './vectorStore';
 import { DocumentInfo } from './documentManagementService';
 import { addDocumentToProject } from './projectService';
+import { ProviderType } from '../contexts/ProviderContext';
 
 // Initialize PDF.js worker
 pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.js`;
@@ -76,7 +78,9 @@ const chunkText = (text: string, chunkSize: number = 1000, overlap: number = 200
 export const processPdfDocument = async (
   projectId: string,
   file: File,
-  progressCallback?: (progress: number) => void
+  progressCallback?: (progress: number) => void,
+  provider: ProviderType = 'browser',
+  embeddingModelId?: string
 ): Promise<DocumentInfo> => {
   const documentId = uuidv4();
   const fileName = file.name;
@@ -130,12 +134,16 @@ export const processPdfDocument = async (
     
     // Generate embeddings for all chunks
     const texts = chunks.map(chunk => chunk.text);
-    const embeddings = await generateEmbeddings(texts, (progress) => {
-      if (progressCallback) {
-        // Map progress from 0-100 to 50-90
-        progressCallback(50 + Math.round(progress * 0.4));
+    const embeddings = await generateUnifiedEmbeddings(
+      texts,
+      { provider, embeddingModelId },
+      (progress) => {
+        if (progressCallback) {
+          // Map progress from 0-100 to 50-90
+          progressCallback(50 + Math.round(progress * 0.4));
+        }
       }
-    });
+    );
     
     // Store embeddings in vector database
     await storeEmbeddings(
@@ -189,7 +197,9 @@ export const processPdfDocument = async (
 export const processCsvDocument = async (
   projectId: string,
   file: File,
-  progressCallback?: (progress: number, chunkInfo?: { current: number, total: number }) => void
+  progressCallback?: (progress: number, chunkInfo?: { current: number, total: number }) => void,
+  provider: ProviderType = 'browser',
+  embeddingModelId?: string
 ): Promise<DocumentInfo> => {
   const documentId = uuidv4();
   const fileName = file.name;
@@ -275,7 +285,7 @@ export const processCsvDocument = async (
             }
             
             // Process the chunk
-            processChunk(chunksToProcess, documentId, fileName, projectId, chunkCounter, estimatedTotalChunks, progressCallback)
+            processChunk(chunksToProcess, documentId, fileName, projectId, chunkCounter, estimatedTotalChunks, progressCallback, provider, embeddingModelId)
               .then(() => {
                 // Resume parsing
                 parser.resume();
@@ -303,7 +313,7 @@ export const processCsvDocument = async (
               progressCallback(0, { current: chunkCounter, total: estimatedTotalChunks });
             }
             
-            await processChunk(currentChunk, documentId, fileName, projectId, chunkCounter, estimatedTotalChunks, progressCallback);
+            await processChunk(currentChunk, documentId, fileName, projectId, chunkCounter, estimatedTotalChunks, progressCallback, provider, embeddingModelId);
           }
           
           console.log(`Processed ${processedRows} rows from ${fileName}`);
@@ -369,16 +379,22 @@ async function processChunk(
   projectId: string,
   chunkNumber: number,
   totalChunks: number,
-  progressCallback?: (progress: number, chunkInfo?: { current: number, total: number }) => void
+  progressCallback?: (progress: number, chunkInfo?: { current: number, total: number }) => void,
+  provider: ProviderType = 'browser',
+  embeddingModelId?: string
 ): Promise<void> {
   try {
     // Generate embeddings for all texts in the chunk
     const texts = chunk.map(item => item.text);
-    const embeddings = await generateEmbeddings(texts, (progress) => {
-      if (progressCallback) {
-        progressCallback(progress, { current: chunkNumber, total: totalChunks });
+    const embeddings = await generateUnifiedEmbeddings(
+      texts,
+      { provider, embeddingModelId },
+      (progress) => {
+        if (progressCallback) {
+          progressCallback(progress, { current: chunkNumber, total: totalChunks });
+        }
       }
-    });
+    );
     
     // Store embeddings
     await storeEmbeddings(

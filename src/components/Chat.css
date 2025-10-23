@@ -66,6 +66,13 @@
   border-radius: 3px;
 }
 
+.chat-header-model-button .model-provider {
+  color: rgba(147, 197, 253, 0.9);
+  font-size: 0.6875rem;
+  font-weight: 500;
+  font-style: italic;
+}
+
 /* Remove old info button styling */
 .chat-header-info {
   cursor: pointer;

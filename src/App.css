@@ -41,10 +41,22 @@ html {
 
 .app-header {
   padding: 0.75rem 1rem; /* Reduced from 1.5rem 1rem */
-  text-align: center;
   background-color: var(--app-header-bg);
   border-bottom: 1px solid var(--app-border-color);
   flex-shrink: 0; /* Prevent header from shrinking */
+}
+
+.header-content {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+.header-title {
+  text-align: left;
+  flex: 1;
 }
 
 .app-header h1 {
@@ -399,4 +411,116 @@ html {
   flex-direction: column;
   height: 100%;
   overflow: hidden;
+}
+
+/* Settings Button */
+.settings-button {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  background: rgba(59, 130, 246, 0.1);
+  border: 1px solid rgba(59, 130, 246, 0.3);
+  border-radius: 6px;
+  color: #3b82f6;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.settings-button:hover {
+  background: rgba(59, 130, 246, 0.2);
+  border-color: rgba(59, 130, 246, 0.5);
+  transform: translateY(-1px);
+}
+
+.settings-button svg {
+  width: 20px;
+  height: 20px;
+}
+
+/* Settings Modal */
+.settings-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+  padding: 20px;
+}
+
+.settings-modal-content {
+  background: #1e293b;
+  border-radius: 12px;
+  max-width: 800px;
+  width: 100%;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+}
+
+.settings-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1.5rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.settings-modal-header h2 {
+  margin: 0;
+  color: #f3f4f6;
+  font-size: 1.5rem;
+}
+
+.settings-modal-close {
+  background: none;
+  border: none;
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 2rem;
+  cursor: pointer;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  transition: all 0.2s;
+}
+
+.settings-modal-close:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.settings-modal-body {
+  padding: 1.5rem;
+}
+
+/* Mobile responsiveness for settings */
+@media (max-width: 768px) {
+  .header-content {
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .header-title {
+    text-align: center;
+  }
+
+  .settings-button {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .settings-modal-content {
+    max-height: 95vh;
+    margin: 10px;
+  }
 }

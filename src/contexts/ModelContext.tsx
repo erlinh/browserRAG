@@ -67,7 +67,33 @@ export const ModelProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     // Get the initial value from service
     setUseWebGPUState(getUseWebGPU());
     
-    // Get the selected model from persistence
+    // Load default browser model from provider config if available
+    const providerConfig = localStorage.getItem('provider_config');
+    let defaultModelId: string | null = null;
+    
+    if (providerConfig) {
+      try {
+        const parsed = JSON.parse(providerConfig);
+        if (parsed.defaultProvider === 'browser' && parsed.defaultBrowserModel) {
+          defaultModelId = parsed.defaultBrowserModel;
+          console.log('[ModelContext] Loading default browser model:', defaultModelId);
+        }
+      } catch (error) {
+        console.error('Failed to parse provider config in ModelContext:', error);
+      }
+    }
+    
+    // If we have a default model, use it; otherwise check persistence
+    if (defaultModelId) {
+      const matchingModel = MODEL_OPTIONS.find(m => m.id === defaultModelId);
+      if (matchingModel) {
+        setSelectedModelState(matchingModel);
+        console.log('[ModelContext] Set model to default:', matchingModel.name);
+        return;
+      }
+    }
+    
+    // Fall back to persisted model
     const persistedModel = getSelectedModel();
     if (persistedModel) {
       // Find matching model in options
