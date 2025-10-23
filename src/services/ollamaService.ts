@@ -6,6 +6,8 @@
  * Default URL: http://localhost:11434
  */
 
+import { ThinkingParser, emitThinkingEvent } from './thinkingParser';
+
 export interface OllamaConfig {
   baseUrl: string;
 }
@@ -158,6 +160,11 @@ export const generateOllamaCompletion = async (
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
       let fullResponse = '';
+      
+      // Create thinking parser
+      const thinkingParser = new ThinkingParser((thinking) => {
+        emitThinkingEvent(thinking);
+      });
 
       try {
         while (true) {
@@ -174,7 +181,10 @@ export const generateOllamaCompletion = async (
               
               if (parsed.response) {
                 fullResponse += parsed.response;
-                streamCallback(fullResponse);
+                
+                // Process the response to extract thinking and normal content
+                const normalContent = thinkingParser.processToken(parsed.response);
+                streamCallback(normalContent);
               }
               
               // Check if generation is done
@@ -190,7 +200,8 @@ export const generateOllamaCompletion = async (
         reader.releaseLock();
       }
 
-      return fullResponse;
+      // Return only the normal content (without thinking tags)
+      return thinkingParser.getNormalBuffer();
     }
 
     // Handle non-streaming response

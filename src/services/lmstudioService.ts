@@ -6,6 +6,8 @@
  * Default URL: http://localhost:1234/v1
  */
 
+import { ThinkingParser, emitThinkingEvent } from './thinkingParser';
+
 export interface LMStudioConfig {
   baseUrl: string;
   apiKey?: string; // Optional, LMStudio usually doesn't require one
@@ -160,6 +162,11 @@ export const generateLMStudioCompletion = async (
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
       let fullResponse = '';
+      
+      // Create thinking parser
+      const thinkingParser = new ThinkingParser((thinking) => {
+        emitThinkingEvent(thinking);
+      });
 
       try {
         while (true) {
@@ -186,7 +193,10 @@ export const generateLMStudioCompletion = async (
                 
                 if (content) {
                   fullResponse += content;
-                  streamCallback(fullResponse);
+                  
+                  // Process the response to extract thinking and normal content
+                  const normalContent = thinkingParser.processToken(content);
+                  streamCallback(normalContent);
                 }
               } catch (e) {
                 console.warn('Failed to parse streaming chunk:', e);
@@ -198,7 +208,8 @@ export const generateLMStudioCompletion = async (
         reader.releaseLock();
       }
 
-      return fullResponse;
+      // Return only the normal content (without thinking tags)
+      return thinkingParser.getNormalBuffer();
     }
 
     // Handle non-streaming response
