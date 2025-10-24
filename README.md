@@ -10,7 +10,7 @@ Try it out now: **[https://browser-rag.techie.fi/](https://browser-rag.techie.fi
 
 - 🔒 **Privacy-Focused**: All data processing happens in your browser. Your documents never leave your device.
 - 📄 **Document Support**: Upload and process PDF and CSV files.
-- 🔍 **Vector Search**: Uses ChromaDB for efficient similarity search.
+- 🔍 **Vector Search**: Uses localStorage-based vector store for efficient similarity search.
 - 🧠 **Multiple AI Providers**: 
   - **Browser** (Transformers.js) - Run models directly in browser with WebGPU
   - **LMStudio** - Connect to your local LMStudio server
@@ -63,7 +63,7 @@ BrowserRAG implements a complete RAG pipeline:
 1. **Document Processing**: When you upload PDF or CSV files, the app extracts text content.
 2. **Chunking**: Long documents are split into manageable chunks with appropriate overlap.
 3. **Embedding Generation**: Each chunk is converted to a vector embedding (browser-based by default, or via LMStudio/Ollama).
-4. **Vector Storage**: Embeddings are stored in an in-browser ChromaDB instance.
+4. **Vector Storage**: Embeddings are stored in browser localStorage with an in-memory vector store.
 5. **Query Processing**: When you ask a question, it's converted to an embedding and used to find similar document chunks.
 6. **Context Construction**: Relevant chunks are assembled into a prompt for the LLM.
 7. **Response Generation**: Generate responses using:
@@ -84,7 +84,6 @@ For optimal performance, BrowserRAG requires:
 - **React**: Frontend UI
 - **Vite**: Build system and development server
 - **TypeScript**: Type-safe JavaScript
-- **ChromaDB**: Vector database for storing and querying embeddings
 - **Transformers.js**: Run transformer models in the browser
 - **LMStudio API**: OpenAI-compatible API for local models
 - **Ollama API**: REST API for local model management
