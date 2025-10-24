@@ -28,7 +28,10 @@ let normalOutputBuffer = '';
 
 // Check if the model is a chat model that supports chat templates
 const isChatModel = (modelId: string): boolean => {
-  return modelId.includes('DeepSeek') || modelId.includes('Qwen') || modelId.includes('Phi-3');
+  return modelId.includes('DeepSeek') || 
+         modelId.includes('Qwen') || 
+         modelId.includes('Phi-3') || 
+         modelId.includes('SmolLM2');
 };
 
 // Check if the model is a Pleias model

@@ -21,6 +21,20 @@ export const MODEL_OPTIONS: ModelOption[] = [
     speed: 'Medium',
   },
   {
+    id: 'HuggingFaceTB/SmolLM2-135M-Instruct',
+    name: 'SmolLM2 135M Instruct',
+    size: '135M',
+    quality: 'Fair',
+    speed: 'Very Fast',
+  },
+  {
+    id: 'HuggingFaceTB/SmolLM2-1.7B-Instruct',
+    name: 'SmolLM2 1.7B Instruct',
+    size: '1.7B',
+    quality: 'Good',
+    speed: 'Medium',
+  },
+  {
     id: 'onnx-community/Pleias-Pico',
     name: 'Pleias-Pico (CPU)',
     size: '350M',
