@@ -476,6 +476,116 @@ const Chat: React.FC<ChatProps> = ({ documents, projectId, chatId, chatSession }
     });
   };
 
+  // Copy text to clipboard
+  const copyToClipboard = async (text: string, type: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      // Show a temporary success message
+      const event = new CustomEvent('copy-success', { detail: { type } });
+      window.dispatchEvent(event);
+    } catch (err) {
+      console.error('Failed to copy:', err);
+      // Show error message
+      const event = new CustomEvent('copy-error');
+      window.dispatchEvent(event);
+    }
+  };
+
+  // Copy message content
+  const copyMessage = (message: Message) => {
+    copyToClipboard(message.content, 'message');
+  };
+
+  // Copy thoughts content
+  const copyThoughts = (message: Message) => {
+    if (message.thoughtContent) {
+      copyToClipboard(message.thoughtContent, 'thoughts');
+    }
+  };
+
+  // Copy entire conversation
+  const copyConversation = () => {
+    const conversationText = messages
+      .filter(m => !m.isThinking)
+      .map(m => {
+        let text = `${m.role.toUpperCase()}: ${m.content}`;
+        if (m.thoughtContent) {
+          text += `\n\n[THOUGHTS]\n${m.thoughtContent}`;
+        }
+        return text;
+      })
+      .join('\n\n---\n\n');
+    
+    copyToClipboard(conversationText, 'conversation');
+  };
+
+  // Download conversation as text file
+  const downloadConversation = () => {
+    const conversationText = messages
+      .filter(m => !m.isThinking)
+      .map(m => {
+        let text = `${m.role.toUpperCase()} [${m.timestamp.toLocaleString()}]:\n${m.content}`;
+        if (m.thoughtContent) {
+          text += `\n\n[THOUGHTS]\n${m.thoughtContent}`;
+        }
+        return text;
+      })
+      .join('\n\n' + '='.repeat(80) + '\n\n');
+    
+    const header = `Conversation: ${chatSession?.name || 'Chat'}\n` +
+                   `Project ID: ${projectId}\n` +
+                   `Date: ${new Date().toLocaleString()}\n` +
+                   `Messages: ${messages.filter(m => !m.isThinking).length}\n` +
+                   '='.repeat(80) + '\n\n';
+    
+    const fullText = header + conversationText;
+    
+    const blob = new Blob([fullText], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${chatSession?.name || 'chat'}_${new Date().toISOString().split('T')[0]}.txt`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    
+    // Show feedback
+    const event = new CustomEvent('copy-success', { detail: { type: 'download' } });
+    window.dispatchEvent(event);
+  };
+
+  // State for copy feedback
+  const [copyFeedback, setCopyFeedback] = useState<{ type: string; visible: boolean }>({ 
+    type: '', 
+    visible: false 
+  });
+
+  // Handle copy success/error events
+  useEffect(() => {
+    const handleCopySuccess = (event: CustomEvent<{ type: string }>) => {
+      setCopyFeedback({ type: event.detail.type, visible: true });
+      setTimeout(() => {
+        setCopyFeedback({ type: '', visible: false });
+      }, 2000);
+    };
+
+    const handleCopyError = () => {
+      setCopyFeedback({ type: 'error', visible: true });
+      setTimeout(() => {
+        setCopyFeedback({ type: '', visible: false });
+      }, 2000);
+    };
+
+    window.addEventListener('copy-success', handleCopySuccess as EventListener);
+    window.addEventListener('copy-error', handleCopyError as EventListener);
+
+    return () => {
+      window.removeEventListener('copy-success', handleCopySuccess as EventListener);
+      window.removeEventListener('copy-error', handleCopyError as EventListener);
+    };
+  }, []);
+
   // Add to the render method, near where you display errors
   const renderErrorWithRefreshButton = () => {
     if (!error) return null;
@@ -527,19 +637,46 @@ const Chat: React.FC<ChatProps> = ({ documents, projectId, chatId, chatSession }
       {/* Enhanced Header with Model Info */}
       <div className="chat-header">
         <h2>{chatSession?.name || 'Chat'}</h2>
-        <button 
-          className="chat-header-model-button" 
-          onClick={() => setShowHeaderModal(true)}
-          aria-label="Model Settings"
-          title="Click to change model settings"
-        >
-          <span className="model-name">{modelDisplay.name}</span>
-          {modelDisplay.size && <span className="model-size">{modelDisplay.size}</span>}
-          <span className="model-provider">via {modelDisplay.provider}</span>
-          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <polyline points="6 9 12 15 18 9"></polyline>
-          </svg>
-        </button>
+        <div className="chat-header-buttons">
+          <button 
+            className="download-conversation-button" 
+            onClick={downloadConversation}
+            aria-label="Download conversation as text file"
+            title="Download conversation as text file"
+            disabled={messages.filter(m => !m.isThinking).length === 0}
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+              <polyline points="7 10 12 15 17 10"></polyline>
+              <line x1="12" y1="15" x2="12" y2="3"></line>
+            </svg>
+          </button>
+          <button 
+            className="copy-conversation-button" 
+            onClick={copyConversation}
+            aria-label="Copy entire conversation"
+            title="Copy entire conversation to clipboard"
+            disabled={messages.filter(m => !m.isThinking).length === 0}
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+            </svg>
+          </button>
+          <button 
+            className="chat-header-model-button" 
+            onClick={() => setShowHeaderModal(true)}
+            aria-label="Model Settings"
+            title="Click to change model settings"
+          >
+            <span className="model-name">{modelDisplay.name}</span>
+            {modelDisplay.size && <span className="model-size">{modelDisplay.size}</span>}
+            <span className="model-provider">via {modelDisplay.provider}</span>
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="6 9 12 15 18 9"></polyline>
+            </svg>
+          </button>
+        </div>
       </div>
       
       {/* Header Modal with updated click handler */}
@@ -591,6 +728,19 @@ const Chat: React.FC<ChatProps> = ({ documents, projectId, chatId, chatSession }
                 message.isThinking ? 'thinking' : ''
               } ${message.isStreaming ? 'streaming' : ''}`}
             >
+              {!message.isThinking && (
+                <button 
+                  className="copy-message-button" 
+                  onClick={() => copyMessage(message)}
+                  aria-label="Copy message"
+                  title="Copy this message"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                  </svg>
+                </button>
+              )}
               <div className="message-content">
                 {message.isThinking ? (
                   <div className="thinking-indicator">
@@ -610,11 +760,26 @@ const Chat: React.FC<ChatProps> = ({ documents, projectId, chatId, chatSession }
                           ? 'thinking' 
                           : ''
                       }`}>
-                        <div 
-                          className="thoughts-toggle" 
-                          onClick={() => toggleThoughts(message.id)}
-                        >
-                          {message.areThoughtsCollapsed ? 'Show thoughts' : 'Hide thoughts'}
+                        <div className="thoughts-header">
+                          <div 
+                            className="thoughts-toggle" 
+                            onClick={() => toggleThoughts(message.id)}
+                          >
+                            {message.areThoughtsCollapsed ? 'Show thoughts' : 'Hide thoughts'}
+                          </div>
+                          {!message.areThoughtsCollapsed && (
+                            <button 
+                              className="copy-thoughts-button" 
+                              onClick={() => copyThoughts(message)}
+                              aria-label="Copy thoughts"
+                              title="Copy these thoughts"
+                            >
+                              <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                              </svg>
+                            </button>
+                          )}
                         </div>
                         
                         {!message.areThoughtsCollapsed && (
@@ -637,6 +802,32 @@ const Chat: React.FC<ChatProps> = ({ documents, projectId, chatId, chatSession }
       </div>
 
       {progressInfo && <ProgressBar info={progressInfo} />}
+
+      {/* Copy feedback notification */}
+      {copyFeedback.visible && (
+        <div className={`copy-feedback ${copyFeedback.type === 'error' ? 'error' : 'success'}`}>
+          {copyFeedback.type === 'error' ? (
+            <>
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="10"></circle>
+                <line x1="15" y1="9" x2="9" y2="15"></line>
+                <line x1="9" y1="9" x2="15" y2="15"></line>
+              </svg>
+              Failed to copy
+            </>
+          ) : (
+            <>
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="20 6 9 17 4 12"></polyline>
+              </svg>
+              {copyFeedback.type === 'conversation' && 'Conversation copied!'}
+              {copyFeedback.type === 'message' && 'Message copied!'}
+              {copyFeedback.type === 'thoughts' && 'Thoughts copied!'}
+              {copyFeedback.type === 'download' && 'Conversation downloaded!'}
+            </>
+          )}
+        </div>
+      )}
 
       <form className="chat-input-form" onSubmit={handleSubmit}>
         <input
